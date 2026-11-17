@@ -158,3 +158,9 @@ svg.night #token-prisoner { opacity: 0; }
   .settle .stats { gap: 18px; font-size: 11px; }
   #toast { position: fixed !important; bottom: 12px !important; left: 50% !important; }
 }
+
+/* 进入界面（封面）：红章是唯一按钮，悬停时给一点呼吸 */
+svg.intro { display: block; width: 100%; height: 100%; }
+.cover-seal { transition: opacity .18s ease; }
+.cover-seal:hover { opacity: .82; }
+.cover-seal:active { opacity: .68; }

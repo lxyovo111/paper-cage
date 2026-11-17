@@ -1,0 +1,14 @@
+import { launch } from './cdp.mjs';
+import fs from 'node:fs';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p = await launch({ port: 9321, dir: 'C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-desk', w: 1600, h: 1000, scale: 2 });
+const errs=[];
+p.on(m=>{ if(m.method==='Runtime.exceptionThrown') errs.push((m.params.exceptionDetails.text||'')+ ' ' + ((m.params.exceptionDetails.exception||{}).description||'')); });
+await p.send('Page.enable'); await p.send('Runtime.enable');
+await p.send('Emulation.setDeviceMetricsOverride', { width: 1600, height: 1000, deviceScaleFactor: 2, mobile: false });
+await p.send('Page.navigate', { url: 'https://modelscope.cn/studios/lxyovo/six-rules' });
+await sleep(14000);
+const s = await p.send('Page.captureScreenshot', { format: 'png' });
+fs.writeFileSync('tools/d-live-top.png', Buffer.from(s.data,'base64'));
+console.log('ERRS', errs.slice(0,3).join(' | '));
+p.ws.close(); p.proc.kill();

@@ -13,7 +13,7 @@ const RULES = [
   '储藏室的麻绳，全天不许触碰',
   '食堂的刀，任何时候不许取走',
 ];
-await p.goto('http://127.0.0.1:7861/dist/index.html?seed=7&llm=0&speed=0.08');
+await p.goto('http://127.0.0.1:7861/dist/index.html?seed=7&llm=0&speed=0.08&intro=0');
 await sleep(700);
 let ri = 0;
 for (let step = 0; step < 60; step++) {

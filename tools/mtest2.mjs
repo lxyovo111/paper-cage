@@ -19,7 +19,7 @@ const shot = async (name) => {
   console.log('SHOT', name, 'h=' + h);
 };
 const click = async (sel) => ev("(()=>{const el=document.querySelector(" + JSON.stringify(sel) + ");if(!el)return 'no:'+ " + JSON.stringify(sel) + ";el.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true,view:window}));return 'ok';})()");
-await p.send('Page.navigate', { url: 'http://127.0.0.1:7861/dist/index.html?seed=21&llm=0&speed=0.5' });
+await p.send('Page.navigate', { url: 'http://127.0.0.1:7861/dist/index.html?seed=21&llm=0&speed=0.5&intro=0' });
 await sleep(3500);
 await shot('m2-day.png');
 await click('#rules g[data-act=write]'); await sleep(400);

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODS = [
   ['paper', 'ui/paper.js'],
+  ['intro', 'ui/intro.js'],
   ['map', 'ui/map.js'],
   ['engine', 'game/engine.js'],
   ['npc', 'ui/npc.js'],
@@ -23,9 +24,9 @@ function transform(src, tag) {
   while ((m = EXPORT_RE.exec(src))) names.push(m[1]);
   let out = src;
   // import 声明 → 从命名空间解构
-  out = out.replace(/^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+'([^']+)';?\s*$/gm,
+  out = out.replace(/^\s*import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from\s+['"]([^'"]+)['"];?\s*$/gm,
     (all, ns, from) => '  const ' + ns + ' = M[' + JSON.stringify(modTag(from)) + '];');
-  out = out.replace(/^\s*import\s*\{([^}]+)\}\s*from\s+'([^']+)';?\s*$/gm,
+  out = out.replace(/^\s*import\s*\{([^}]+)\}\s*from\s+['"]([^'"]+)['"];?\s*$/gm,
     (all, list, from) => '  const {' + list + '} = M[' + JSON.stringify(modTag(from)) + '];');
   out = out.replace(/^\s*import\s+[^;\n]+;?\s*$/gm, '');
   // 动态 import map.js：直接指向命名空间
@@ -40,6 +41,7 @@ function transform(src, tag) {
 function modTag(p) {
   if (p.indexOf('engine') >= 0) return 'engine';
   if (p.indexOf('paper') >= 0) return 'paper';
+  if (p.indexOf('intro') >= 0) return 'intro';
   if (p.indexOf('map') >= 0) return 'map';
   if (p.indexOf('npc') >= 0) return 'npc';
   if (p.indexOf('mobile') >= 0) return 'mobile';

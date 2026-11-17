@@ -1,6 +1,7 @@
 // app.js — 游戏主控。渲染归 screen.js，判定归 engine.js，语言归 npc.js。
 import { renderScreen } from './screen.js';
 import { renderMobile, renderMobileSettle, isMobileView } from './mobile.js';
+import { renderIntro, renderIntroMobile } from './intro.js';
 import * as E from '../game/engine.js';
 import { compileSmart, chooseHole, remark, warm, llmOn } from './npc.js';
 
@@ -55,6 +56,12 @@ function syncView() {
   view.rules = g.rules.map((r) => ({ text: r.text, note: r.note }));
 }
 async function paint() {
+  // 进入界面：封面也分横竖两版，和游戏本体用同一套纸与印章
+  if (view && view.phase === 'cover') {
+    if (isMobileView()) { stage.style.aspectRatio = '800 / 1840'; stage.innerHTML = renderIntroMobile(); }
+    else { stage.style.aspectRatio = ''; stage.innerHTML = renderIntro(); }
+    return;
+  }
   // 手机竖屏走 mobile.js 的纵向版式；桌面仍是 screen.js 的 1600×1000 一屏。规则与判定完全一致。
   if (isMobileView()) {
     const settle = view.phase === 'settle';
@@ -95,6 +102,12 @@ async function pathFor(route) {
 }
 
 // ---------- 开局 ----------
+// 封面：只填 paint 需要的字段，真正的状态在 newGame() 里创建
+function showCover() {
+  view = { phase:'cover', day:1, ap:3, apMax:3, obedience:100, hostility:30, rules:[], report:[], path:null, tokens:null };
+  paint();
+}
+
 function newGame() {
   const m = /[?&]seed=(\d+)/.exec(location.search);
   g = E.createGame(m ? +m[1] : (Date.now() % 90000) + 1000);
@@ -399,11 +412,15 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'again') { newGame(); return; }
+  if (act === 'start' || act === 'again') { newGame(); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
-document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeSheet(); });
+document.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape') closeSheet();
+  // 封面支持回车 / 空格开始
+  if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); newGame(); }
+});
 // 手机 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
 let __wasMobile = isMobileView();
 window.addEventListener('resize', () => {
@@ -411,6 +428,7 @@ window.addEventListener('resize', () => {
   if (now !== __wasMobile) { __wasMobile = now; paint(); }
 });
 
-newGame();
+// ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
+if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
 warm();   // 预热语言模型，别让第一条规矩撞上冷启动
-window.__game = { get g() { return g; }, get view() { return view; }, newGame, E, showSettle, askNight, askWrite };
+window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
