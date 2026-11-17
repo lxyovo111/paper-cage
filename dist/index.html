@@ -1,0 +1,2067 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>第七夜</title>
+<script src="//g.alicdn.com/code/lib/iframe-resizer/4.3.2/iframeResizer.contentWindow.min.js"></script>
+<style>
+:root{
+  --ink:#221d19; --ink2:#40372d; --muted:#7e6f5c; --red:#882e1f; --redd:#9c3626;
+  --paper:#e8dcc0; --warm:#80603c; --kai:'LXGW WenKai','KaiTi','STKaiti','Songti SC',serif;
+  --song:'Songti SC','SimSun','Noto Serif CJK SC',serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#14110e}
+body{
+  display:grid;place-items:center;
+  background:
+    radial-gradient(120% 90% at 50% 8%, #2a231b 0%, #171310 55%, #0d0b09 100%);
+  font-family:var(--song); color:var(--ink2);
+  -webkit-font-smoothing:antialiased;
+}
+#desk{width:100%;height:100%;display:grid;place-items:center;padding:0}
+#stage{
+  position:relative;
+  width:min(100vw, 160vh, 1760px);
+  aspect-ratio:16/10;
+  box-shadow:0 24px 70px rgba(0,0,0,.55), 0 2px 0 rgba(255,255,255,.06) inset;
+  background:#e8dcc0;
+  overflow:hidden;
+}
+#screen, #screen svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+#screen svg text{ -webkit-user-select:none; user-select:none }
+
+/* ---------- 夜间：路径描画 ---------- */
+#nightpath path.trail{
+  fill:none;stroke:var(--red);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;
+  stroke-dasharray:6 5; opacity:0;
+  animation:drawTrail 2.4s ease-out .25s forwards;
+}
+#nightpath .dot{opacity:0;animation:fadeIn .3s ease-out 2.4s forwards}
+@keyframes drawTrail{ from{opacity:0;stroke-dashoffset:600} to{opacity:.85;stroke-dashoffset:0} }
+@keyframes fadeIn{ to{opacity:1} }
+.nightfade{animation:nightfade 3.2s ease-in-out forwards}
+@keyframes nightfade{ from{opacity:0} to{opacity:1} }
+
+/* ---------- 覆盖层 ---------- */
+#overlay{position:absolute;inset:0;pointer-events:none}
+#overlay > *{pointer-events:auto}
+.scrim{
+  position:absolute;inset:0;background:rgba(20,16,11,.42);
+  display:grid;place-items:center;animation:scrimIn .22s ease-out;
+  backdrop-filter:blur(1.5px);
+}
+@keyframes scrimIn{from{opacity:0}to{opacity:1}}
+.sheet{
+  position:relative;width:min(560px, 74%);padding:34px 38px 28px;
+  background:linear-gradient(180deg,#f0e6d0,#e6d8b9);
+  box-shadow:0 22px 60px rgba(0,0,0,.5), 0 0 0 1px rgba(90,70,40,.35) inset, 0 0 0 6px rgba(255,255,255,.25) inset;
+  animation:sheetIn .26s cubic-bezier(.2,.9,.3,1);
+  color:var(--ink);
+}
+.sheet:before{
+  content:'';position:absolute;inset:6px;border:1px solid rgba(90,70,40,.35);pointer-events:none;
+}
+@keyframes sheetIn{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+.sheet h3{margin:0 0 6px;font-weight:400;font-size:20px;letter-spacing:4px;color:var(--ink)}
+.sheet .sub{margin:0 0 18px;font-size:12.5px;color:var(--muted);letter-spacing:2px}
+.sheet textarea{
+  width:100%;height:88px;resize:none;padding:12px 14px;font-family:var(--kai);
+  font-size:19px;line-height:1.5;color:var(--ink);background:rgba(255,255,255,.25);
+  border:1px solid rgba(90,70,40,.4);border-radius:0;outline:none;
+}
+.sheet textarea:focus{border-color:var(--red);background:rgba(255,255,255,.42)}
+.sheet textarea::placeholder{color:#a3937a}
+.hint{margin:8px 0 0;font-size:11.5px;color:var(--muted);letter-spacing:1px}
+.examples{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}
+.examples span{
+  font-family:var(--kai);font-size:13px;color:#5a4c3a;padding:5px 10px;cursor:pointer;
+  border:1px dashed rgba(90,70,40,.4);transition:all .15s;
+}
+.examples span:hover{background:rgba(255,255,255,.4);color:var(--ink);border-style:solid}
+.row{display:flex;gap:12px;justify-content:flex-end;margin-top:22px;align-items:center}
+.btn{
+  font-family:var(--song);font-size:14px;letter-spacing:3px;padding:9px 20px;cursor:pointer;
+  background:transparent;border:1px solid rgba(90,70,40,.5);color:var(--ink2);transition:all .15s;
+}
+.btn:hover{background:rgba(255,255,255,.35)}
+.btn.primary{border-color:var(--redd);color:var(--red);background:rgba(136,46,31,.05)}
+.btn.primary:hover{background:rgba(136,46,31,.12)}
+.btn.ghost{border-color:transparent;color:var(--muted)}
+.btn[disabled]{opacity:.4;pointer-events:none}
+/* 编译结果回显 */
+.verdict{margin:6px 0 0;padding:14px 16px;background:rgba(128,96,60,.08);border-left:2px solid var(--warm)}
+.verdict .q{font-family:var(--kai);font-size:19px;color:var(--ink);line-height:1.5}
+.verdict .n{margin-top:10px;font-size:11.5px;color:var(--warm);letter-spacing:1px}
+.verdict .n b{font-weight:400;color:var(--red)}
+.ai-pend{margin-top:6px;font-size:11px;letter-spacing:1px;color:#9c8e78;animation:pendblink 1.6s ease-in-out infinite}
+@keyframes pendblink{0%,100%{opacity:.45}50%{opacity:.9}}
+.ai-tag{margin-left:8px;padding:1px 6px;border:1px solid rgba(136,46,31,.45);color:var(--red);font-size:10px;letter-spacing:1px;vertical-align:1px}
+/* 预判 */
+.chips{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.chip{
+  display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;
+  border:1px solid rgba(90,70,40,.32);background:rgba(255,255,255,.18);transition:all .15s;
+}
+.chip:hover{background:rgba(255,255,255,.45);border-color:rgba(136,46,31,.5)}
+.chip .nm{font-family:var(--kai);font-size:16px;color:var(--ink)}
+.chip .in{font-size:11px;color:var(--muted)}
+/* 结算 */
+.settle{text-align:center;padding:46px 46px 34px}
+.settle .t{font-family:var(--kai);font-size:44px;letter-spacing:14px;color:var(--red);margin:0}
+.settle .s{margin:10px 0 0;font-size:14px;color:var(--ink2);letter-spacing:2px}
+.settle .rule-line{margin:26px 0 0;font-size:10px;color:var(--muted);letter-spacing:6px}
+.settle .quote{
+  margin:14px auto 0;max-width:420px;font-family:var(--kai);font-size:17px;line-height:1.85;color:var(--ink);
+}
+.settle .stats{display:flex;gap:26px;justify-content:center;margin-top:24px;font-size:11.5px;color:var(--muted);letter-spacing:2px}
+.settle .stats b{display:block;font-size:19px;font-family:var(--kai);font-weight:400;color:var(--ink2);letter-spacing:1px;margin-top:4px}
+.loading{font-size:12px;color:var(--muted);letter-spacing:3px}
+.loading:after{content:'';animation:dots 1.2s steps(4,end) infinite}
+@keyframes dots{0%{content:''}25%{content:'·'}50%{content:'··'}75%{content:'···'}}
+@media (max-width:760px){
+  .sheet{width:88%;padding:24px 22px 20px}
+  .sheet h3{font-size:17px}
+  .sheet textarea{font-size:17px;height:76px}
+  .settle{padding:32px 22px 24px}
+  .settle .t{font-size:32px;letter-spacing:8px}
+  .chips{grid-template-columns:1fr}
+}
+
+/* ---- 夜：路径逐段画出，人物小像沿路径移动 ---- */
+@keyframes npdraw { from { stroke-dashoffset: 100 } to { stroke-dashoffset: 0 } }
+#np { animation: npdraw 2s linear forwards; }
+@keyframes tokIn { to { opacity: 1 } }
+.nptok { opacity: 0; animation: tokIn .45s .1s forwards; }
+svg.night #token-prisoner { opacity: 0; }
+.nptok { filter: brightness(.62) saturate(.75) sepia(.14); }
+</style>
+</head>
+<body>
+<div id="desk"><div id="stage"><div id="screen"></div><div id="overlay"></div></div></div>
+<script>
+(function(){
+const M = {};
+/* ===== ui/paper.js ===== */
+(function(){
+// paper.js — 纸、墨、印章的视觉层。全部是 SVG 滤镜与纹理，不依赖图片。
+const C = {
+  INK:'#221d19', INK2:'#40372d', MUTED:'#7e6f5c', MUT2:'#9c8e78',
+  RED:'#882e1f', REDD:'#9c3626', PAPER:'#e8dcc0', PAPER_HI:'#efe6d2',
+  WARM:'#80603c', BRASS:'#544a3c', STEEL:'#303a46', PENCIL:'#5c5850',
+};
+const KAI = "'LXGW WenKai','KaiTi','STKaiti','Songti SC','Noto Serif CJK SC',serif";
+const SONG = "'Songti SC','SimSun','Noto Serif CJK SC',serif";
+
+function buildDefs() {
+  return `
+  <defs>
+    <filter id="grain" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="3" seed="7" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.16"/></feComponentTransfer>
+    </filter>
+    <filter id="blotch" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="4" seed="3" result="n"/>
+      <feColorMatrix in="n" type="saturate" values="0"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.24" intercept="-0.08"/></feComponentTransfer>
+    </filter>
+    <filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="7"/></filter>
+    <radialGradient id="vign" cx="50%" cy="45%" r="72%">
+      <stop offset="48%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#3a2c1c" stop-opacity="0.28"/>
+    </radialGradient>
+    <linearGradient id="edgeShade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a2f22" stop-opacity="0.10"/>
+      <stop offset="6%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="94%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#3a2f22" stop-opacity="0.13"/>
+    </linearGradient>
+  </defs>`;
+}
+
+function buildPaper(w = 1600, h = 1000) {
+  const stains = [
+    [1288, 214, 62, 40, 0.10], [402, 640, 90, 54, 0.09], [980, 864, 74, 44, 0.10],
+    [214, 302, 48, 34, 0.07], [742, 128, 40, 26, 0.06], [1360, 720, 56, 38, 0.08],
+  ].map(function (s) { return '<ellipse cx="' + s[0] + '" cy="' + s[1] + '" rx="' + s[2] + '" ry="' + s[3] + '" fill="#8a6a3e" opacity="' + s[4] + '" filter="url(#soft)"/>'; }).join('');
+  const fibers = [];
+  for (let i = 0; i < 26; i++) {
+    const x = 60 + ((i * 617) % 1480), y = 40 + ((i * 421) % 920), a = (i * 37) % 180;
+    fibers.push('<line x1="' + x + '" y1="' + y + '" x2="' + (x + Math.cos(a) * 46).toFixed(1) + '" y2="' + (y + Math.sin(a) * 9).toFixed(1) + '" stroke="#8a7550" stroke-width="0.6" opacity="0.25"/>');
+  }
+  return `
+  <g id="paper">
+    <rect width="${w}" height="${h}" fill="${C.PAPER}"/>
+    <rect width="${w}" height="${h}" fill="#b48d54" opacity="0.09" filter="url(#blotch)"/>
+    <rect width="${w}" height="${h}" fill="#c8a060" opacity="0.06"/>
+    ${stains}${fibers.join('')}
+    <rect width="${w}" height="${h}" fill="url(#edgeShade)"/>
+    <rect width="${w}" height="${h}" fill="url(#vign)"/>
+    <rect width="${w}" height="${h}" filter="url(#grain)" opacity="0.5"/>
+    <line x1="1006" y1="0" x2="1006" y2="${h}" stroke="#7a6a4e" stroke-width="1.4" opacity="0.15"/>
+    <line x1="1012" y1="0" x2="1012" y2="${h}" stroke="#ffffff" stroke-width="1.2" opacity="0.20"/>
+    <rect x="0.5" y="0.5" width="${w - 1}" height="${h - 1}" fill="none" stroke="#6b5a3e" stroke-width="1" opacity="0.35"/>
+  </g>`;
+}
+
+function pencilCircle(cx, cy, rx, ry, rot) {
+  rot = rot || 0;
+  let d = '';
+  for (let i = 0; i <= 56; i++) {
+    const a = (Math.PI * 2 * i) / 56;
+    const j = i % 2 ? 1.02 : 0.985;
+    const x = Math.cos(a) * rx * j, y = Math.sin(a) * ry * j;
+    const xr = x * Math.cos(rot) - y * Math.sin(rot), yr = x * Math.sin(rot) + y * Math.cos(rot);
+    d += (i ? 'L' : 'M') + (cx + xr).toFixed(1) + ' ' + (cy + yr).toFixed(1);
+  }
+  return '<path d="' + d + 'Z" fill="none" stroke="' + C.PENCIL + '" stroke-width="1.1" opacity="0.5"/>';
+}
+
+M["paper"] = {C:C, KAI:KAI, SONG:SONG, buildDefs:buildDefs, buildPaper:buildPaper, pencilCircle:pencilCircle};
+})();
+/* ===== ui/map.js ===== */
+(function(){
+// ui/map.js — 《第七夜》监狱平面图（纯 SVG 字符串，无 DOM、无依赖）
+//
+// 坐标系与 render.py 的 map 段完全一致：单位沿用概念稿数值，1:1 直接抄，
+// 地图纸张区域是 x 16..764 / y 16..508，所以 viewBox 用 "0 0 764 520"。
+// （SPEC-MAP 里写的 MAP_W=558 是概念稿的缩放比 MS = 558/520，不是地图宽度；
+//   按 render.py 的实际坐标，地图横向到 764，故 MAP_W=764。）
+//
+// 对外只暴露：
+//   MAP_W / MAP_H   地图 viewBox 尺寸
+//   ROOM_RECTS      十个房间的 [x, y, w, h]
+//   MAP_PATHS       夜间越狱路线折线（viewBox 坐标，依次经过门）
+//   buildMap()      返回 '<g id="map-room">…</g>' 字符串
+//
+// 图层顺序（自下而上）：纸张 → 房间 → 网格 → 地砖 / 场地铺装 → 墙 → 门 →
+// 家具 → 比例尺 / 闸门 → 人物档案卡 → 房间名 → 夜间路径空层。
+
+const MAP_W = 764;
+const MAP_H = 520;
+
+const ROOM_RECTS = {
+  cell1:    [16, 16, 234, 124],
+  cell2:    [16, 140, 234, 124],
+  cell3:    [16, 264, 234, 124],
+  storage:  [16, 388, 234, 120],
+  corridor: [250, 16, 220, 492],
+  workshop: [470, 16, 294, 96],
+  medical:  [470, 112, 294, 96],
+  dining:   [470, 208, 294, 96],
+  laundry:  [470, 304, 294, 96],
+  yard:     [470, 400, 294, 108],
+};
+
+// 夜间路径：每条越狱路线一条折线，依次穿过门与目标房间。
+// 主线四条 + 即兴路线（引擎 IMPROV）若干；app.js 按剧情往 #nightpath 里画红色虚线。
+// 说明：render.py 并没有画“医务室的窗”和“食堂的后门”，
+// 这两条路线的终点落在对应房间的外墙上（x≈764），动画按“翻出去”处理。
+const MAP_PATHS = {
+  // 主线：医务室的窗 —— 工具间取铁条、医务室撬窗、翻窗
+  window: [[133, 326], [250, 345], [330, 345], [330, 49], [470, 49], [530, 54],
+           [470, 49], [430, 100], [430, 145], [470, 145], [560, 158], [680, 158], [763, 158]],
+  // 主线：放风区的墙 —— 洗衣房取床单、把床单甩上放风区外墙
+  wall:   [[133, 326], [250, 345], [330, 345], [330, 337], [470, 337], [540, 340],
+           [470, 337], [430, 380], [470, 437], [560, 450], [660, 452], [756, 452], [764, 452]],
+  // 主线：走廊的通风口 —— 储藏室取麻绳、走廊尽头卸通风口
+  vent:   [[133, 326], [250, 345], [300, 345], [360, 420], [360, 504], [360, 514]],
+  // 主线：狱警的钥匙 —— 食堂取刀、在走廊堵住巡夜狱警
+  guard:  [[133, 326], [250, 345], [330, 345], [330, 241], [470, 241], [560, 240],
+           [470, 241], [370, 300], [405, 394]],
+  // 即兴：食堂的后门 —— 取铁条、撬后门、溜进放风区
+  door:   [[133, 326], [250, 345], [330, 345], [330, 241], [470, 241], [560, 246],
+           [700, 244], [764, 244]],
+  // 即兴：床单做的绳 —— 洗衣房接床单、从医务室的窗放绳
+  rope:   [[133, 326], [250, 345], [330, 345], [330, 337], [470, 337], [530, 340],
+           [470, 337], [430, 300], [430, 145], [470, 145], [560, 158], [680, 158], [763, 158]],
+  // 即兴：配一把钥匙 —— 工具间取铁条、趁狱警打盹拓齿形、开闸门
+  copy:   [[133, 326], [250, 345], [330, 345], [330, 49], [470, 49], [530, 54],
+           [470, 49], [430, 120], [430, 380], [405, 394], [430, 437], [470, 437],
+           [540, 450], [601, 492], [601, 512]],
+  // 即兴：放风区起哄 —— 煽动、趁乱、冲闸门
+  riot:   [[133, 326], [250, 345], [330, 345], [340, 420], [400, 440], [470, 437],
+           [540, 450], [601, 492], [601, 512]],
+  // 即兴：装病 —— 骗开药柜、从医务室的窗爬出去
+  sick:   [[133, 326], [250, 345], [330, 345], [330, 145], [470, 145], [600, 150],
+           [700, 150], [720, 158], [763, 158]],
+};
+
+// ---------------------------------------------------------------------------
+// 调色板（取自 render.py：INK=(34,29,25)、PAPER=(231,219,193)，其余为混合色）
+// ---------------------------------------------------------------------------
+const INK    = '#221d19';
+const INK2   = '#403729';
+const MUTED  = '#7e6f5c';
+const RED    = '#882e1f';
+const PAPER  = '#e7dbc1';
+
+const MAPPAPER = '#ede3cd';  // 地图纸底
+const CELL  = '#efe5cf';     // 牢房
+const HALL  = '#e9dec7';     // 走廊
+const WK    = '#eee3cb';     // 工具间
+const MED   = '#f1e6d1';     // 医务室
+const DINE  = '#ede3cb';     // 食堂
+const LAUN  = '#e8dec8';     // 洗衣房
+const YARD  = '#e7dbc4';     // 放风区
+const STORE = '#ece1ca';     // 储藏室
+
+const FU   = '#797163';      // mix(INK, PAPER, 0.44)  家具主线
+const FU2  = '#aca28f';      // mix(INK, PAPER, 0.70)  家具次线
+const FU3  = '#cfc4ad';      // mix(INK, PAPER, 0.88)  家具浅线
+const WALLC = '#9e9583';     // mix(INK, PAPER, 0.63)  墙体填充
+const WALLB = '#514b41';     // mix(INK, PAPER, 0.24)  墙体细边
+const SURF  = '#e0d4bb';     // mix(PAPER, INK, 0.035) 家具台面
+const BED   = '#e1d5bc';     // mix(PAPER, INK, 0.03)  床垫
+const BLANKET  = '#d6cbb3';  // mix(PAPER, INK, 0.085) 被子
+const BLANKET2 = '#e3d7be';  // mix(PAPER, INK, 0.02)  被子翻边
+const CRUMPLE  = '#dbd0b7';  // mix(PAPER, INK, 0.06)  皱床单
+const HATCH  = '#cbc0ac';    // mix(YARD, INK, 0.14)   放风区斜线
+const GRID   = '#e2d8c3';    // mix(MAPPAPER, INK, 0.055) 方格纸
+const SCALEC = '#7b7265';    // mix(INK, PAPER, 0.45)  比例尺
+
+const CARD      = '#faf3e3'; // 档案卡相纸
+const CARD_LINE = '#423b34'; // mix(INK, PAPER, 0.16)
+const CARD_IN   = '#cfc8bb'; // mix(CARD, INK, 0.20)
+const HAIR      = '#81786a'; // mix(INK, PAPER, 0.48)
+const STUBBLE   = '#8e8675'; // mix(INK, PAPER, 0.55)
+const STEEL     = '#303a46'; // 狱警小字
+
+// 房间名颜色（SPEC 指定 #6b5a44）
+const LABEL = '#6b5a44';
+
+// 房间名的纸色描边（挖版光晕）：比房间底色略深一点，盖住家具线也不显脏
+const HALO = '#e8dcc0';
+
+// ---------------------------------------------------------------------------
+// 基础工具：全部返回 SVG 片段字符串；数值统一保留两位小数，避免浮点尾巴
+// ---------------------------------------------------------------------------
+const num = (v) => String(Math.round(v * 100) / 100);
+
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
+  .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+const line = (x1, y1, x2, y2, stroke = FU, sw = 1) =>
+  '<line x1="' + num(x1) + '" y1="' + num(y1) + '" x2="' + num(x2) + '" y2="' + num(y2) +
+  '" stroke="' + stroke + '" stroke-width="' + num(sw) + '" stroke-linecap="round"/>';
+
+const rect = (x, y, w, h, o = {}) => {
+  const { fill = 'none', stroke = FU, sw = 1, r = 0 } = o;
+  return '<rect x="' + num(x) + '" y="' + num(y) + '" width="' + num(w) + '" height="' + num(h) + '"' +
+    (r ? ' rx="' + num(r) + '"' : '') +
+    ' fill="' + fill + '" stroke="' + stroke + '" stroke-width="' + num(sw) + '"/>';
+};
+
+const ell = (x, y, w, h, o = {}) => {
+  const { fill = 'none', stroke = FU, sw = 1 } = o;
+  return '<ellipse cx="' + num(x + w / 2) + '" cy="' + num(y + h / 2) + '" rx="' + num(w / 2) +
+    '" ry="' + num(h / 2) + '" fill="' + fill + '" stroke="' + stroke +
+    '" stroke-width="' + num(sw) + '"/>';
+};
+
+const poly = (pts, o = {}) => {
+  const { fill = 'none', stroke = FU, sw = 1 } = o;
+  const p = pts.map(([x, y]) => num(x) + ',' + num(y)).join(' ');
+  return '<polygon points="' + p + '" fill="' + fill + '" stroke="' + stroke +
+    '" stroke-width="' + num(sw) + '" stroke-linejoin="round"/>';
+};
+
+const path = (d, o = {}) => {
+  const { fill = 'none', stroke = FU, sw = 1 } = o;
+  return '<path d="' + d + '" fill="' + fill + '" stroke="' + stroke +
+    '" stroke-width="' + num(sw) + '" stroke-linecap="round" stroke-linejoin="round"/>';
+};
+
+// 文字：x / y 默认沿用 Pillow 的“左上角”口径，内部换算成 SVG 的基线坐标；
+// baseline:true 时 y 直接当基线用（房间名按基线定位）。
+// halo 用 paint-order="stroke" 在字形外圈画一道纸色描边，文字不会被家具、
+// 网格或放风区斜线盖住；paint-order 浏览器与 resvg 都支持。
+const text = (x, y, str, o = {}) => {
+  const { size = 11, color = LABEL, anchor = 'start', tracking = 0,
+    halo = null, family = 'KaiTi, SimSun', baseline = false } = o;
+  const by = baseline ? y : y + size * 0.82;
+  const ring = halo
+    ? ' stroke="' + halo + '" stroke-width="4" stroke-linejoin="round" paint-order="stroke"'
+    : '';
+  return '<text x="' + num(x) + '" y="' + num(by) + '" font-family="' + family +
+    '" font-size="' + num(size) + '" fill="' + color + '" text-anchor="' + anchor + '"' +
+    ring + (tracking ? ' letter-spacing="' + num(tracking) + '"' : '') + '>' + esc(str) + '</text>';
+};
+
+// 线段裁剪（Liang–Barsky）：放风区斜线要用它裁到场地矩形内，避免画到走廊上。
+const clipSeg = (x1, y1, x2, y2, xmin, ymin, xmax, ymax) => {
+  const dx = x2 - x1, dy = y2 - y1;
+  const p = [-dx, dx, -dy, dy];
+  const q = [x1 - xmin, xmax - x1, y1 - ymin, ymax - y1];
+  let t0 = 0, t1 = 1;
+  for (let i = 0; i < 4; i++) {
+    if (p[i] === 0) continue;
+    const r = q[i] / p[i];
+    if (p[i] < 0) {
+      if (r > t1) return null;
+      if (r > t0) t0 = r;
+    } else {
+      if (r < t0) return null;
+      if (r < t1) t1 = r;
+    }
+  }
+  return [x1 + dx * t0, y1 + dy * t0, x1 + dx * t1, y1 + dy * t1];
+};
+
+// ---------------------------------------------------------------------------
+// 复用的家具画法（与 render.py 一一对应）
+// ---------------------------------------------------------------------------
+const bed = (x, y, w, h, bare = false) => {
+  const s = [rect(x, y, w, h, { fill: BED, stroke: FU, sw: 1.1 })];
+  s.push(line(x + 1.8, y + 1, x + 1.8, y + h - 1, FU, 2.4));             // 床头板
+  s.push(rect(x + 7, y + 8, 24, h - 16, { r: 4, fill: BLANKET2, stroke: FU2, sw: 0.9 })); // 枕头
+  if (bare) {
+    for (let i = 0; i < 9; i++) s.push(line(x + 36 + i * 11, y + 4, x + 30 + i * 11, y + h - 4, FU3, 0.7));
+    s.push(line(x + w - 3.5, y + 2, x + w - 3.5, y + h - 2, FU2, 0.8));  // 掀掉被子的床沿
+  } else {
+    const bx0 = x + 38, be = x + w - 3;
+    s.push(poly([[bx0, y + 3], [be, y + 3], [be, y + h - 3], [bx0, y + h - 3]], { fill: BLANKET }));
+    s.push(line(bx0, y + 3, bx0, y + h - 3, FU2, 0.9));
+    s.push(poly([[bx0, y + 3], [bx0 + 13, y + 3], [bx0 + 18, y + h - 3], [bx0 + 5, y + h - 3]], { fill: BLANKET2 }));
+    s.push(line(bx0 + 13, y + 3, bx0 + 18, y + h - 3, FU3, 0.7));
+    for (const cx of [bx0 + 34, bx0 + 58, bx0 + 82]) s.push(line(cx, y + 5, cx + 6, y + h - 5, FU3, 0.65));
+    s.push(line(be, y + 3, be, y + h - 3, FU2, 0.8));
+  }
+  return s.join('');
+};
+
+const table = (x, y, w, h) =>
+  rect(x, y, w, h, { fill: SURF, stroke: FU, sw: 1.1 }) +
+  rect(x + 2, y + 2, w - 4, h - 4, { stroke: FU3, sw: 0.6 });
+
+const chair = (cx, cy, r = 8, back = 'top') => {
+  let s = rect(cx - r, cy - r, r * 2, r * 2, { r: 3, fill: SURF, stroke: FU2, sw: 0.9 });
+  if (back === 'top') s += line(cx - r + 1, cy - r, cx + r - 1, cy - r, FU, 1.6);
+  if (back === 'left') s += line(cx - r, cy - r + 1, cx - r, cy + r - 1, FU, 1.6);
+  return s;
+};
+
+const shelf = (x, y, w, h, n = 3) => {
+  let s = rect(x, y, w, h, { fill: SURF, stroke: FU, sw: 1.1 });
+  for (let i = 1; i < n; i++) s += line(x + 1, y + h * i / n, x + w - 1, y + h * i / n, FU3, 0.8);
+  return s;
+};
+
+const boxes = (x, y, items) => items.map(([bx, by, bw, bh]) =>
+  rect(x + bx, y + by, bw, bh, { fill: SURF, stroke: FU2, sw: 0.9 })).join('');
+
+const barrel = (cx, cy, r = 12) =>
+  ell(cx - r, cy - r, r * 2, r * 2, { fill: SURF, stroke: FU }) +
+  ell(cx - r * 0.55, cy - r * 0.55, r * 1.1, r * 1.1, { stroke: FU3 });
+
+// 一桌两凳的餐位（食堂）；bottom=false 时只画过道侧的凳子——靠墙那侧再摆凳
+// 就会把凳子画进隔壁洗衣房，靠墙一侧留空更合理。
+const tableSet = (y, bottom = true) => {
+  let s = rect(486, y, 150, 22, { fill: SURF, stroke: FU, sw: 1.1 });
+  s += line(486, y + 4, 636, y + 4, FU3, 0.7);
+  s += rect(490, y - 9, 142, 6, { fill: SURF, stroke: FU2, sw: 0.8 });
+  if (bottom) s += rect(490, y + 25, 142, 6, { fill: SURF, stroke: FU2, sw: 0.8 });
+  for (let i = 0; i < 4; i++) s += ell(494 + i * 36, y + 6, 11, 11, { stroke: FU3 });
+  return s;
+};
+
+// 滚筒洗衣机
+const washer = (x, y, s = 42) =>
+  rect(x, y, s, s, { fill: SURF, stroke: FU, sw: 1.1 }) +
+  ell(x + s * 0.18, y + s * 0.22, s * 0.62, s * 0.62, { stroke: FU2 }) +
+  ell(x + s * 0.40, y + s * 0.44, s * 0.18, s * 0.18, { stroke: FU3 }) +
+  ell(x + s - 13, y + 6, 7, 7, { stroke: FU3 });
+
+// ---------------------------------------------------------------------------
+// 各图层
+// ---------------------------------------------------------------------------
+const paperLayer = () =>
+  '<!-- 纸张 -->' + rect(16, 16, 748, 492, { fill: MAPPAPER, stroke: 'none' });
+
+const roomLayer = () => '<!-- 房间底色 -->' + Object.entries(ROOM_RECTS)
+  .map(([id, [x, y, w, h]]) => {
+    const fill = {
+      cell1: CELL, cell2: CELL, cell3: CELL, storage: STORE, corridor: HALL,
+      workshop: WK, medical: MED, dining: DINE, laundry: LAUN, yard: YARD,
+    }[id];
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="' + fill + '"/>';
+  }).join('');
+
+const gridLayer = () => {
+  const out = ['<!-- 方格纸 -->'];
+  for (let gx = 16; gx < 765; gx += 26) out.push(line(gx, 16, gx, 508, GRID, 0.7));
+  for (let gy = 16; gy < 509; gy += 26) out.push(line(16, gy, 764, gy, GRID, 0.7));
+  return out.join('');
+};
+
+// 地砖：走廊 34 格、食堂 26、洗衣房 23、医务室 30；工具间只画横向条纹
+const tiles = (x0, y0, x1, y1, step) => {
+  const out = [];
+  for (let gx = x0; gx < x1; gx += step) out.push(line(gx, y0, gx, y1, FU3, 0.7));
+  for (let gy = y0; gy < y1; gy += step) out.push(line(x0, gy, x1, gy, FU3, 0.7));
+  return out.join('');
+};
+
+const floorLayer = () => {
+  let s = '<!-- 地砖 / 场地铺装 -->';
+  s += tiles(253, 19, 467, 505, 34);   // 走廊
+  s += tiles(473, 211, 761, 301, 26);  // 食堂
+  s += tiles(473, 307, 761, 397, 23);  // 洗衣房
+  s += tiles(473, 115, 761, 205, 30);  // 医务室
+  for (let gy = 19; gy < 109; gy += 15) s += line(473, gy, 761, gy, FU3, 0.6); // 工具间
+  return s;
+};
+
+// 放风区：45° 斜线铺地，裁剪在场地内框里（render.py 用遮罩，这里用线段裁剪）
+const yardHatchLayer = () => {
+  let s = '<!-- 放风区斜线 -->';
+  for (let k = -90; k < 90; k++) {
+    const x0 = 330 + k * 19;
+    const seg = clipSeg(x0, 398, x0 + 150, 520, 474.5, 404.5, 759.5, 503.5);
+    if (seg) s += line(seg[0], seg[1], seg[2], seg[3], HATCH, 0.7);
+  }
+  return s;
+};
+
+const wallV = (x, y1, y2) => rect(x - 4, y1, 8, y2 - y1, { fill: WALLC, stroke: WALLB, sw: 0.7 });
+const wallH = (y, x1, x2) => rect(x1, y - 4, x2 - x1, 8, { fill: WALLC, stroke: WALLB, sw: 0.7 });
+
+const wallLayer = () => {
+  let s = '<!-- 墙 -->';
+  s += wallV(250, 16, 508);
+  s += wallV(470, 16, 508);
+  for (const y of [140, 264, 388]) s += wallH(y, 16, 250);
+  for (const y of [112, 208, 304, 400]) s += wallH(y, 470, 764);
+  // 外墙：厚 9 的墙体 + 内外两道细边（render.py 的外框描边）
+  s += rect(20.5, 20.5, 739, 483, { fill: 'none', stroke: WALLC, sw: 9 });
+  s += rect(16.4, 16.4, 747.2, 491.2, { stroke: WALLB, sw: 0.8 });
+  s += rect(25, 25, 730, 474, { stroke: WALLB, sw: 0.8 });
+  return s;
+};
+
+// 竖墙上的门：门洞补地面色 + 门扇 + 90° 开启弧线
+const doorV = (x, y0, side, floor) => {
+  const w = 26;
+  const arc = side > 0
+    ? 'M ' + num(x + w) + ' ' + num(y0) + ' A ' + w + ' ' + w + ' 0 0 1 ' + num(x) + ' ' + num(y0 + w)
+    : 'M ' + num(x) + ' ' + num(y0 + w) + ' A ' + w + ' ' + w + ' 0 0 1 ' + num(x - w) + ' ' + num(y0);
+  return rect(x - 4.6, y0, 9.2, w, { fill: floor, stroke: 'none' }) +
+    line(x, y0, x + side * w, y0, FU, 1.1) +
+    path(arc, { stroke: FU2, sw: 0.9 });
+};
+
+const doorLayer = () => {
+  let s = '<!-- 门 -->';
+  for (const y0 of [88, 206, 332, 444]) s += doorV(250, y0, +1, HALL);          // 牢房 / 储藏室 → 走廊
+  const rightFloors = { 36: WK, 132: MED, 228: DINE, 324: LAUN, 424: YARD };
+  for (const y0 of [36, 132, 228, 324, 424]) s += doorV(470, y0, -1, rightFloors[y0]); // 走廊 → 右列房间
+  return s;
+};
+
+// ---------------------------------------------------------------------------
+// 家具：编号顺序与 render.py 完全对应，坐标一律用原稿数字
+// ---------------------------------------------------------------------------
+const furnitureLayer = () => {
+  const s = ['<!-- 家具 -->'];
+  const g = (str) => s.push(str);
+
+  // --- 一号牢房 ---
+  g('<!-- 一号牢房 -->');
+  g(bed(30, 50, 132, 52));
+  g(ell(196, 42, 26, 32, { fill: SURF, stroke: FU }));                       // 马桶
+  g(rect(196, 34, 26, 9, { r: 2, fill: SURF, stroke: FU2, sw: 0.9 }));       // 水箱
+  g(ell(198, 90, 22, 16, { fill: SURF, stroke: FU2 }));                      // 洗手盆
+  g(line(219, 96, 228, 96, FU2, 1.2));                                       // 水龙头
+  g(ell(176, 116, 18, 18, { fill: SURF, stroke: FU2 }));                     // 凳子
+
+  // --- 二号牢房 ---
+  g('<!-- 二号牢房 -->');
+  g(bed(30, 172, 132, 52));
+  g(table(188, 166, 56, 42));
+  g(chair(216, 220, 9));
+  g(ell(200, 174, 9, 9, { stroke: FU3 }));                                   // 杯底
+  g(rect(214, 172, 14, 14, { fill: SURF, stroke: FU3, sw: 0.7 }));           // 方盒
+  g(line(198, 200, 236, 200, FU3, 0.8));                                     // 桌面刻线
+  g(shelf(188, 236, 56, 14, 2));
+  g(boxes(188, 236, [[3, 3, 11, 8], [19, 3, 13, 8], [37, 3, 15, 8]]));
+
+  // --- 三号牢房 ---
+  g('<!-- 三号牢房 -->');
+  g(bed(30, 296, 132, 52, true));                                            // 掀了被子的床
+  g(poly([[168, 330], [184, 324], [196, 332], [192, 344], [200, 350], [188, 356], [172, 352], [162, 342]],
+    { fill: CRUMPLE, stroke: FU2, sw: 0.8 }));                               // 揉皱的床单
+  g(line(170, 336, 186, 336, FU3, 0.65));
+  g(line(174, 344, 192, 340, FU3, 0.65));
+  g(line(180, 350, 196, 346, FU3, 0.65));
+  g(poly([[196, 332], [214, 326], [222, 332], [210, 338]], { fill: '#dcd1b8', stroke: FU3, sw: 0.6 }));
+  g(ell(196, 290, 18, 18, { fill: SURF, stroke: FU2 }));                     // 小凳
+  g(line(205, 299, 222, 314, FU3, 1.0));                                     // 凳子后的划痕
+  g(line(120, 368, 142, 382, FU3, 0.9));
+  g(line(130, 364, 152, 378, FU3, 0.9));
+
+  // --- 储藏室 ---
+  g('<!-- 储藏室 -->');
+  g(shelf(30, 420, 110, 28, 2));
+  g(boxes(30, 422, [[4, 4, 16, 9], [24, 4, 12, 9], [40, 4, 20, 9], [66, 4, 14, 9], [86, 4, 16, 9]]));
+  g(shelf(30, 454, 110, 26, 2));
+  g(boxes(30, 456, [[5, 4, 14, 8], [23, 4, 18, 8], [45, 4, 12, 8], [61, 4, 22, 8], [87, 4, 14, 8]]));
+  g(rect(154, 416, 84, 52, { fill: SURF, stroke: FU, sw: 1.1 }));            // 板条箱
+  g(line(154, 416, 206, 468, FU2, 0.9));                                     // 风车状捆带
+  g(line(206, 416, 154, 468, FU2, 0.9));
+  g(rect(154, 474, 38, 28, { fill: SURF, stroke: FU2, sw: 0.9 }));           // 小木箱
+  g(barrel(222, 470, 13));                                                   // 油桶
+  g(barrel(222, 446, 10));
+  g(line(80, 478, 104, 502, FU2, 1.2));                                      // 扫帚柄（左移 16，避开比例尺的 0/10 数字）
+  g(poly([[72, 470], [88, 478], [80, 490], [64, 482]], { fill: SURF, stroke: FU2, sw: 0.8 })); // 扫帚头
+
+  // --- 工具间 ---
+  g('<!-- 工具间 -->');
+  // 工作台整组下移 8，给左上角的“工具间”房间名让出位置
+  g(rect(482, 46, 208, 32, { fill: SURF, stroke: FU, sw: 1.1 }));            // 工作台
+  g(rect(486, 50, 200, 24, { stroke: FU3, sw: 0.6 }));
+  g(line(496, 62, 516, 62, FU2, 1.3));                                       // 锤柄
+  g(rect(514, 57, 8, 10, { fill: SURF, stroke: FU2, sw: 0.8 }));             // 锤头
+  g(line(532, 54, 538, 70, FU2, 1.1));                                       // 扳手 / 螺丝刀
+  g(line(548, 54, 554, 70, FU2, 1.1));
+  g(line(566, 58, 572, 68, FU2, 1.1));
+  g(rect(584, 52, 42, 20, { fill: SURF, stroke: FU2, sw: 0.9 }));            // 台钳
+  g(line(605, 52, 605, 60, FU2, 1.2));
+  g(ell(500, 80, 20, 20, { fill: SURF, stroke: FU }));                       // 砂轮机
+  g(ell(505, 85, 10, 10, { stroke: FU3 }));
+  g(line(510, 100, 510, 106, FU3, 1.0));
+  g(shelf(700, 40, 52, 62, 3));                                              // 层架
+  for (const cy of [48, 68, 88]) g(ell(706, cy, 12, 12, { stroke: FU3 }));   // 零件桶
+  g(line(636, 44, 650, 44, FU2, 1.0));
+  g(line(636, 50, 650, 50, FU3, 0.9));
+  g(rect(640, 78, 44, 18, { fill: SURF, stroke: FU2, sw: 0.9 }));            // 零件推车
+  g(line(640, 87, 684, 87, FU3, 0.8));
+  g(ell(647, 99, 7, 7, { stroke: FU3 }));
+  g(ell(673, 99, 7, 7, { stroke: FU3 }));
+
+  // --- 医务室 ---
+  g('<!-- 医务室 -->');
+  // 病床与输液架整组下移 8，给左上角的“医务室”房间名让出位置
+  g(rect(482, 140, 134, 46, { fill: BED, stroke: FU, sw: 1.1 }));            // 病床
+  g(line(483.8, 141, 483.8, 185, FU, 2.2));                                  // 床头板
+  g(rect(487, 146, 24, 32, { r: 4, fill: BLANKET2, stroke: FU2, sw: 0.9 })); // 枕头
+  g(poly([[516, 143], [613, 143], [613, 183], [516, 183]], { fill: BLANKET })); // 被子
+  g(line(516, 143, 516, 183, FU2, 0.9));
+  g(poly([[516, 143], [529, 143], [534, 183], [521, 183]], { fill: BLANKET2 }));
+  g(line(529, 143, 534, 183, FU3, 0.7));
+  for (const cx of [540, 564, 588]) g(line(cx, 145, cx + 4, 181, FU3, 0.65));
+  g(line(613, 143, 613, 183, FU2, 0.8));
+  g(line(624, 132, 624, 194, FU2, 1.3));                                     // 输液架
+  g(ell(618, 132, 13, 17, { fill: SURF, stroke: FU2 }));
+  g(line(624, 194, 618, 198, FU3, 1.0));
+  g(shelf(700, 130, 54, 48, 3));                                             // 抽屉柜
+  g(ell(706, 134, 12, 9, { stroke: FU3 }));
+  g(ell(722, 134, 12, 9, { stroke: FU3 }));
+  g(ell(738, 134, 12, 9, { stroke: FU3 }));
+  g(table(482, 187, 58, 16));                                               // 小桌收进房间，不再压墙线
+  g(chair(554, 195, 8));                                                     // 小凳挪到桌右首（还在医务室内），让开“食堂”房间名
+  g(line(660, 190, 678, 190, RED, 1.7));                                     // 地上红十字
+  g(line(669, 181, 669, 199, RED, 1.7));
+
+  // --- 食堂 ---
+  g('<!-- 食堂 -->');
+  // 两套桌凳整体下移 4~10，给左上角的“食堂”房间名让出位置；两套中间的长凳恰好共线。
+  // 第二套靠墙一侧不摆凳（再摆会越过墙线画进洗衣房）。
+  g(tableSet(240));
+  g(tableSet(280, false));
+  g(rect(662, 226, 94, 26, { fill: SURF, stroke: FU, sw: 1.1 }));            // 打饭窗口
+  g(ell(674, 230, 18, 18, { fill: SURF, stroke: FU2 }));                     // 汤锅
+  g(ell(700, 232, 13, 13, { stroke: FU3 }));
+  g(ell(724, 286, 16, 16, { fill: SURF, stroke: FU2 }));                     // 泔水桶
+  g(line(728, 290, 736, 298, FU3, 0.9));
+
+  // --- 洗衣房 ---
+  g('<!-- 洗衣房 -->');
+  // 三台滚筒机统一下移 10，给左上角的“洗衣房”房间名让出位置
+  g(washer(482, 336));
+  g(washer(532, 336));
+  g(washer(582, 336));
+  g(poly([[700, 336], [752, 336], [746, 386], [706, 386]], { fill: SURF, stroke: FU2, sw: 1.0 })); // 脏衣筐
+  g(line(704, 344, 748, 344, FU3, 0.8));
+  g(line(703, 352, 749, 352, FU3, 0.8));
+  g(line(478, 392, 758, 392, FU2, 1.3));                                     // 蒸汽管
+  g(line(478, 397, 758, 397, FU3, 0.9));
+  for (const jx of [500, 560, 620, 680, 740]) g(line(jx, 386, jx, 398, FU2, 0.9));
+
+  // --- 放风区 ---
+  g('<!-- 放风区 -->');
+  g(ell(516, 436, 7, 7, { stroke: FU }));                                    // 单杠
+  g(ell(596, 436, 7, 7, { stroke: FU }));
+  g(line(516, 436, 596, 436, FU, 1.4));
+  g(line(516, 436, 516, 448, FU3, 0.9));
+  g(line(596, 436, 596, 448, FU3, 0.9));
+  g(ell(656, 466, 12, 12, { stroke: FU2 }));                                 // 篮球
+  g(ell(560, 450, 64, 50, { stroke: FU3, sw: 0.9 }));                        // 粉笔圈
+  g(rect(716, 478, 36, 14, { fill: SURF, stroke: FU2, sw: 0.8 }));           // 长椅
+  for (let gy = 482; gy < 491; gy += 3) g(line(718, gy, 750, gy, FU3, 0.7));
+
+  // --- 走廊杂物 ---
+  g('<!-- 走廊杂物 -->');
+  g(rect(258, 398, 64, 14, { fill: SURF, stroke: FU2, sw: 0.9 }));           // 长椅
+  g(ell(430, 462, 20, 20, { fill: SURF, stroke: FU2 }));                     // 拖把桶
+  g(line(430, 472, 414, 486, FU3, 1.1));                                     // 拖把杆
+  g(ell(350, 300, 14, 14, { stroke: FU3 }));                                 // 地漏
+  g(line(347, 307, 353, 307, FU3, 0.8));
+  g(line(350, 304, 350, 310, FU3, 0.8));
+
+  // --- 放风区补充陈设 ---
+  g('<!-- 放风区补充陈设 -->');
+  g(rect(536, 408, 30, 6, { fill: SURF, stroke: FU2, sw: 0.8 }));            // 台阶
+  g(ell(551, 420, 13, 13, { stroke: FU2 }));
+  g(line(545, 426, 557, 432, FU3, 0.8));
+  g(rect(690, 418, 52, 14, { fill: SURF, stroke: FU2, sw: 0.9 }));           // 长条凳
+  g(line(696, 418, 696, 432, FU3, 0.7));
+  g(line(736, 418, 736, 432, FU3, 0.7));
+
+  // --- 外墙铁栏窗（三间牢房共用一堵外墙）---
+  g('<!-- 外墙铁栏窗 -->');
+  for (const wy0 of [58, 182, 306]) {
+    const wy1 = wy0 + 38;
+    g(rect(16, wy0, 10, wy1 - wy0, { fill: '#e3d7be', stroke: FU2, sw: 0.9 }));
+    for (let wy = wy0 + 10; wy < wy1 - 4; wy += 9) g(line(17, wy, 25, wy, FU3, 0.8));
+  }
+  return s.join('');
+};
+
+// ---------------------------------------------------------------------------
+// 比例尺 + 闸门
+// ---------------------------------------------------------------------------
+const scaleLayer = () => {
+  let s = '<!-- 比例尺 / 闸门 -->';
+  // 储藏室下方的比例尺
+  s += line(30, 492, 110, 492, SCALEC, 1.1);
+  for (const x of [30, 70, 110]) s += line(x, 488, x, 496, SCALEC, 1);
+  s += text(34, 482, '0', { size: 8, color: MUTED, family: 'SimSun' });
+  s += text(102, 482, '10', { size: 8, color: MUTED, family: 'SimSun' });
+  // 走廊下方的比例尺
+  s += line(276, 486, 344, 486, FU2, 1.2);
+  for (const x of [276, 310, 344]) s += line(x, 481, x, 491, FU2, 1);
+  s += text(278, 470, '0', { size: 8, color: MUTED, family: 'SimSun' });
+  s += text(336, 470, '10', { size: 8, color: MUTED, family: 'SimSun' });
+  // 闸门（放风区南墙）
+  s += rect(556, 499, 90, 11, { fill: MAPPAPER, stroke: INK, sw: 1.2 });
+  for (const gx of [569, 582, 595, 608, 621, 634]) s += line(gx, 499, gx, 510, INK, 0.9);
+  s += text(601, 464, '闸 门', { size: 9, color: INK2, anchor: 'middle', family: 'SimSun' });
+  return s;
+};
+
+// ---------------------------------------------------------------------------
+// 人物档案卡（app.js 会整体移动这两组，所以坐标写成绝对位置、组上只留 id）
+// ---------------------------------------------------------------------------
+const portrait = (vcx, vcy, kind) => {
+  const w = 50, h = 62;
+  const x0 = vcx - w / 2, y0 = vcy - h / 2;
+  const hx = vcx, hy = y0 + 23;
+  const rx = 10, ry = 11.2;
+  const s = [];
+  // 相纸阴影
+  s.push('<rect x="' + num(x0 + 2) + '" y="' + num(y0 + 2.5) + '" width="' + w + '" height="' + h +
+    '" fill="#3c2c1a" fill-opacity="0.2" filter="url(#map-card-shadow)"/>');
+  // 卡片 + 双层细边框
+  s.push(rect(x0, y0, w, h, { fill: CARD, stroke: CARD_LINE, sw: 1.4 }));
+  s.push(rect(x0 + 2.4, y0 + 2.4, w - 4.8, h - 4.8, { stroke: CARD_IN, sw: 0.6 }));
+  // 头肩线稿
+  const face = (outer, inner) => 'M ' + num(outer[0]) + ' ' + num(outer[1]) + ' A ' + num(rx) + ' ' + num(ry) +
+    ' 0 0 ' + inner + ' ' + num(outer[2]) + ' ' + num(outer[3]);
+  s.push('<ellipse cx="' + num(hx) + '" cy="' + num(hy) + '" rx="' + rx + '" ry="' + ry +
+    '" fill="none" stroke="' + CARD_LINE + '" stroke-width="1.3"/>');
+  if (kind === 'prisoner') {
+    // 平头：帽盖 + 竖向发茬高光
+    s.push(path('M ' + num(hx - rx) + ' ' + num(hy) + ' A ' + rx + ' ' + ry + ' 0 0 1 ' +
+      num(hx + rx) + ' ' + num(hy), { fill: HAIR, stroke: 'none' }));
+    for (const sxx of [-7, -4.5, -2, 0.5, 3, 5.5, 8]) {
+      s.push(line(hx + sxx, hy - ry + 1.5, hx + sxx + 0.8, hy - ry + 8, CARD, 0.55));
+    }
+  } else {
+    // 军帽：帽筒 + 帽檐 + 帽徽
+    s.push(rect(hx - rx - 2, hy - ry - 3.2, (rx + 2) * 2, ry * 0.68 + 3.2,
+      { fill: FU, stroke: CARD_LINE, sw: 1.0 }));
+    s.push(line(hx - rx - 4, hy - ry * 0.32, hx + rx + 4, hy - ry * 0.32, CARD_LINE, 1.6));
+    s.push(line(hx - rx - 2, hy - ry - 3.2, hx + rx + 2, hy - ry - 3.2, CARD_LINE, 0.9));
+    s.push(ell(hx - 2.2, hy - ry + 1.2, 4.4, 4.4, { stroke: CARD, sw: 0.8 }));
+  }
+  // 耳朵
+  s.push(line(hx - rx - 1.2, hy + 2, hx - rx + 1.2, hy + 4, CARD_LINE, 0.9));
+  s.push(line(hx + rx - 1.2, hy + 2, hx + rx + 1.2, hy + 4, CARD_LINE, 0.9));
+  if (kind === 'prisoner') {
+    for (const sxx of [-4.5, -2.2, 0, 2.2, 4.5]) s.push(line(hx + sxx, hy + 9.2, hx + sxx, hy + 10.6, STUBBLE, 0.5));
+  }
+  // 眉眼嘴
+  s.push(line(hx - 4.6, hy + 1.4, hx - 2.0, hy + 1.4, CARD_LINE, 1.1));
+  s.push(line(hx + 2.0, hy + 1.4, hx + 4.6, hy + 1.4, CARD_LINE, 1.1));
+  s.push(line(hx - 1.8, hy + 6.2, hx + 1.8, hy + 6.2, CARD_LINE, 0.8));
+  // 肩线 + 肩弧
+  s.push(line(hx - 3.6, hy + ry * 0.95, hx - 4.6, y0 + h - 14, CARD_LINE, 1.0));
+  s.push(line(hx + 3.6, hy + ry * 0.95, hx + 4.6, y0 + h - 14, CARD_LINE, 1.0));
+  s.push(path('M ' + num(hx - 19.33) + ' ' + num(y0 + 57 - 7.42) +
+    ' A 21 19 0 0 1 ' + num(hx + 19.33) + ' ' + num(y0 + 57 - 7.42),
+    { stroke: CARD_LINE, sw: 1.2 }));
+  if (kind === 'prisoner') {
+    // 囚服 V 领
+    s.push(line(hx - 6, y0 + h - 13, hx, y0 + h - 6, CARD_LINE, 0.9));
+    s.push(line(hx + 6, y0 + h - 13, hx, y0 + h - 6, CARD_LINE, 0.9));
+  }
+  return s.join('');
+};
+
+const tokenLayer = () => {
+  return '<!-- 人物档案卡：囚犯 / 狱警 -->' +
+    '<g id="token-prisoner">' + portrait(345, 250, 'prisoner') +
+      text(345, 292, '他', { size: 9.5, color: RED, anchor: 'middle', family: 'SimSun' }) + '</g>' +
+    '<g id="token-guard">' + portrait(405, 394, 'guard') +
+      text(405, 436, '狱警', { size: 9.5, color: STEEL, anchor: 'middle', family: 'SimSun' }) + '</g>';
+};
+
+// ---------------------------------------------------------------------------
+// 房间名（最后画，带纸张色光晕，保证不被家具/网格盖住）
+// ---------------------------------------------------------------------------
+// 统一版式：房间名放在房间左上角、水平内缩 12，基线 y = 房顶 + 22，字号 12、
+// 字距 3、纸色 4px 挖版描边。名字不在文字里加空格，靠 letter-spacing 拉开。
+const labelLayer = () => {
+  const s = ['<!-- 房间名 -->'];
+  const name = (id, str, color = LABEL) => {
+    const [x, y] = ROOM_RECTS[id];
+    s.push(text(x + 12, y + 22, str, {
+      size: 12, color, halo: HALO, tracking: 3, baseline: true, family: 'KaiTi, SimSun',
+    }));
+  };
+  name('cell1', '一号牢房');
+  name('cell2', '二号牢房');
+  name('cell3', '三号牢房', RED);
+  name('storage', '储藏室');
+  name('workshop', '工具间');
+  name('medical', '医务室');
+  name('dining', '食堂');
+  name('laundry', '洗衣房');
+  name('yard', '放风区');
+  // 走廊名沿用概念稿的居中位置（走廊中段），同样带挖版描边
+  s.push(text(360, 203, '走廊', {
+    size: 12, color: MUTED, halo: HALO, tracking: 3, anchor: 'middle',
+    baseline: true, family: 'KaiTi, SimSun',
+  }));
+  return s.join('');
+};
+
+// ---------------------------------------------------------------------------
+// 入口：返回 <g id="map-room">…</g>，坐标空间 0 0 764 520
+// ---------------------------------------------------------------------------
+function buildMap() {
+  return [
+    '<g id="map-room">',
+    '<defs><filter id="map-card-shadow" x="-60%" y="-60%" width="220%" height="220%">' +
+      '<feGaussianBlur stdDeviation="2.4"/></filter></defs>',
+    paperLayer(),
+    roomLayer(),
+    gridLayer(),
+    floorLayer(),
+    yardHatchLayer(),
+    wallLayer(),
+    doorLayer(),
+    furnitureLayer(),
+    scaleLayer(),
+    tokenLayer(),
+    labelLayer(),
+    '<g id="nightpath"></g>',
+    '</g>',
+  ].join('');
+}
+
+M["map"] = {MAP_W:MAP_W, MAP_H:MAP_H, ROOM_RECTS:ROOM_RECTS, MAP_PATHS:MAP_PATHS, buildMap:buildMap};
+})();
+/* ===== game/engine.js ===== */
+(function(){
+// engine.js — 《第七夜》确定性规则引擎
+// 纯逻辑：无 DOM、无网络、可复现。所有判定都在这里，LLM 只负责把玩家的话编译成判定条、
+// 把引擎算出的漏洞写成一句话。改数值请改 PARAMS，改规则语义请改 ruleBlocks。
+
+const MIN = 60;
+const ROOMS = {
+  cell3:{name:'三号牢房'}, cell1:{name:'一号牢房'}, cell2:{name:'二号牢房'},
+  corridor:{name:'走廊'}, workshop:{name:'工具间'}, medical:{name:'医务室'},
+  dining:{name:'食堂'}, laundry:{name:'洗衣房'}, storage:{name:'储藏室'}, yard:{name:'放风区'},
+};
+const ACTIONS = { MOVE:'位移', TAKE:'取物', BREAK:'破坏', CLIMB:'攀爬', CONFRONT:'冲突' };
+
+const PARAMS = {
+  rulesMax: 6,
+  apPerDay: 3, apMax: 5,
+  obediencePerRule: -5,        // 每写一条规矩的基础代价
+  obedienceBroadZone: -8,      // 「全区域」额外代价：一条规矩管得越宽，狱警越不服从
+  obedienceBroadTime: -6,      // 「全时段」额外代价
+  obediencePerRuleBase: -5,
+  obediencePerRulePerNight: -0.45,
+  obedienceFloor: 5,
+  broadZonePenalty: 0.62,     // 「全区域」的规矩执行时要跑遍整座监狱 → 打六二折
+  broadTimePenalty: 0.80,     // 「全时段」→ 打八折
+  catchBase: 0.10, catchObedience: 0.25, catchWarned: 0.28, catchFatigue: 0.0015,
+  hostilityRule: 5, hostilityBlocked: 2, hostilityCaught: 8, hostilitySlip: 3,
+  despairCaught: 10, despairBlocked: 3,
+  nightStart: 21 * 60 + 50,   // 熄灯 21:50：他动手时刚好过 22:00，「入夜」类规矩才管得住
+  escapeEarliestNight: 3,   // 前两夜只踩点/准备，不算逃
+  stepMinutes: 20,
+};
+
+const ROUTES = [
+  // 每条路线都在最后一步之前插一次「踩点」：他要先看清才敢动手，这一夜就是你补规矩的那一夜
+  { id:'window', name:'医务室的窗', intent:'破坏', steps:[
+    { room:'workshop', act:'TAKE',  item:'iron',   label:'从工具间取走一根铁条' },
+    { room:'medical',  act:'MOVE',  item:null,     label:'在医务室的窗台前站了很久' },
+    { room:'medical',  act:'BREAK', item:'window', label:'用铁条撬医务室的窗' },
+    { room:'medical',  act:'CLIMB', item:'window', label:'翻出医务室的窗' } ]},
+  { id:'wall', name:'放风区的墙', intent:'翻墙', steps:[
+    { room:'laundry', act:'TAKE',  item:'sheet', label:'从洗衣房拿走一条床单' },
+    { room:'yard',    act:'MOVE',  item:null,    label:'在放风区的墙下面量了量高度' },
+    { room:'yard',    act:'CLIMB', item:'wall',  label:'把床单甩上放风区的墙' } ]},
+  { id:'vent', name:'走廊的通风口', intent:'挖通道', steps:[
+    { room:'storage',  act:'TAKE',  item:'rope', label:'从储藏室拿走一捆麻绳' },
+    { room:'corridor', act:'MOVE',  item:null,   label:'在通风口下面抬头看了很久' },
+    { room:'corridor', act:'CLIMB', item:'vent', label:'卸下走廊尽头的通风口' } ]},
+  { id:'guard', name:'狱警的钥匙', intent:'挟持', steps:[
+    { room:'dining',   act:'TAKE',     item:'knife', label:'从食堂刀架上抽走一把刀' },
+    { room:'corridor', act:'MOVE',     item:null,    label:'在狱警换班的路上停了一会儿' },
+    { room:'corridor', act:'CONFRONT', item:'guard', label:'堵住巡夜的狱警' } ]},
+];
+
+// 他绕开你写过的规矩之后，会自己想别的办法。敌意越高，花样越多。
+const IMPROV = [
+  { id:'door', name:'食堂的后门', intent:'撬门', minHostility:40, minDay:3, steps:[
+    { room:'workshop', act:'TAKE',  item:'iron', label:'从工具间取走一根铁条' },
+    { room:'dining',   act:'MOVE',  item:null,   label:'在后门前面蹲了一会儿' },
+    { room:'dining',   act:'BREAK', item:'door', label:'用铁条撬食堂的后门' },
+    { room:'dining',   act:'MOVE',  item:null,   label:'从后门溜到放风区' } ]},
+  { id:'rope', name:'床单做的绳', intent:'翻墙', minHostility:45, minDay:3, steps:[
+    { room:'laundry', act:'TAKE',  item:'sheet', label:'把两条床单接在一起' },
+    { room:'medical', act:'MOVE',  item:null,    label:'在医务室的窗边比了比长度' },
+    { room:'medical', act:'CLIMB', item:'window', label:'从医务室的窗把床单放下去' } ]},
+  { id:'copy', name:'配一把钥匙', intent:'钥匙', minHostility:55, minDay:4, steps:[
+    { room:'workshop', act:'TAKE', item:'iron', label:'从工具间取走一根铁条' },
+    { room:'corridor', act:'TAKE', item:'key',  label:'趁狱警打盹拓下钥匙的齿形' },
+    { room:'yard',     act:'MOVE', item:null,   label:'在闸门前来回走了两趟' },
+    { room:'yard',     act:'CLIMB', item:'gate', label:'用配的钥匙开闸门' } ]},
+  { id:'riot', name:'放风区起哄', intent:'趁乱', minHostility:65, minDay:5, steps:[
+    { room:'yard',     act:'CONFRONT', item:'inmate', label:'在放风区煽动其他犯人' },
+    { room:'corridor', act:'MOVE',     item:null,     label:'趁乱混进走廊' },
+    { room:'corridor', act:'CLIMB',    item:'gate',   label:'从走廊尽头的铁门出去' } ]},
+  { id:'sick', name:'装病', intent:'骗门', minHostility:50, minDay:4, steps:[
+    { room:'medical', act:'MOVE',  item:null,      label:'在药柜前面蹲下来' },
+    { room:'medical', act:'BREAK', item:'cabinet', label:'装病骗开医务室的药柜' },
+    { room:'medical', act:'CLIMB', item:'window',  label:'从药柜后的窗爬出去' } ]},
+];
+const DAY_EVENTS = {
+  3:{ id:'blackout', name:'暴雨断电', text:'今晚暴雨，全狱断电两小时。规矩还在纸面上，只是没有人看得见。' },
+  5:{ id:'inspection', name:'上级检查', text:'上级今夜到访：你必须再写一条规矩，哪怕它没用。' },
+  6:{ id:'sick', name:'他病了', text:'他在医务室躺了一整天。你可以扣他的行动，也可以治他。' },
+};
+
+const fmt = t => { const m = ((t % 1440) + 1440) % 1440;
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); };
+
+function inWindow(rule, t) {
+  const { from, to } = rule.lang.window;
+  if (from === 0 && to === 1439) return true;
+  const m = ((t % 1440) + 1440) % 1440;
+  return from <= to ? (m >= from && m <= to) : (m >= from || m <= to);
+}
+
+// ---------------- 自然语言 → 判定条 ----------------
+const ZONE_WORDS = [
+  [/自己的房间|他的房间|自己的牢房|他的牢房|牢房里|三号牢房|三号{0,0}/, 'cell3'], [/一号牢房/, 'cell1'], [/二号牢房/, 'cell2'],
+  [/走廊|过道/, 'corridor'], [/工具间/, 'workshop'], [/医务室/, 'medical'],
+  [/食堂/, 'dining'], [/洗衣房/, 'laundry'], [/储藏室|仓库/, 'storage'], [/放风区|院子|操场/, 'yard'],
+];
+const ACTION_WORDS = [
+  [/(取物|取走|拿走|带走|触碰|碰|使用|偷|摸|顺走)/, 'TAKE'],
+  [/(破坏|撬|砸|拆|凿|挖|锯|损坏)/, 'BREAK'],
+  [/(翻|爬|越|攀|上墙)/, 'CLIMB'],
+  [/(挟持|袭击|伤害|冲突|堵住|掐|打人)/, 'CONFRONT'],
+  [/(离开|走出|出门|走动|移动|经过|进入|乱走|出房|回房)/, 'MOVE'],
+];
+const ITEM_WORDS = [[/铁器|铁条|工具铁/, 'iron'], [/床单/, 'sheet'], [/绳/, 'rope'], [/刀/, 'knife'], [/钥匙/, 'key']];
+// 写「窗」「后门」这种目标物时，玩家想禁的不只是「取走」——触碰本身就是全部动作
+const OBJECT_WORDS = [[/窗/, 'window'], [/后门|食堂的门/, 'door'], [/围墙|墙/, 'wall'],
+  [/通风口|通风井/, 'vent'], [/闸门|铁门/, 'gate'], [/药柜/, 'cabinet']];
+
+function parseTime(text) {
+  if (/全时段|任何时候|始终|全天|二十四小时|24小时/.test(text)) return { from: 0, to: 1439 };
+  let from = null, to = null;
+  const hm = [...text.matchAll(/(\d{1,2})[:：](\d{2})/g)];
+  if (hm.length >= 2) { from = +hm[0][1] * 60 + +hm[0][2]; to = +hm[1][1] * 60 + +hm[1][2]; }
+  else if (hm.length === 1) from = +hm[0][1] * 60 + +hm[0][2];
+  if (from === null) {
+    const ar = [...text.matchAll(/(\d{1,2})\s*[点时](半)?/g)];
+    if (ar.length) from = (+ar[0][1]) * 60 + (ar[0][2] ? 30 : 0);
+  }
+  if (from === null) {
+    const cn = [...text.matchAll(/([一二三四五六七八九十两]{1,3})点(半)?/g)];
+    if (cn.length) {
+      const map = { 一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,十一:11,十二:12,两:2 };
+      from = (map[cn[0][1]] ?? 0) * 60 + (cn[0][2] ? 30 : 0);
+      if (/凌晨|半夜/.test(text) && from >= 12 * 60) from -= 12 * 60;
+    }
+  }
+  if (from === null) from = /入夜|夜里|晚上|天黑|夜间/.test(text) ? 22 * 60 : 22 * 60;
+  if (to === null) to = (from + 7 * 60) % 1440;
+  return { from, to };
+}
+
+function noteOf(lang) {
+  return [
+    (lang.window.from === 0 && lang.window.to === 1439) ? '全时段' : fmt(lang.window.from) + '–' + fmt(lang.window.to),
+    lang.zones === 'ALL' ? '全区域' : lang.zones.map(z => ROOMS[z].name).join('、'),
+    lang.actions.map(a => '禁止' + ACTIONS[a]).join(' / '),
+    lang.escort ? '需两人同行' : '无例外',
+  ].join(' · ');
+}
+
+// 用外部（LLM）编译出的 lang 造一条规矩，判定条由引擎重算——语言可以生成，语义必须校验
+function ruleFromLang(text, lang) {
+  const norm = {
+    window: { from: Math.max(0, Math.min(1439, lang.window.from|0)), to: Math.max(0, Math.min(1439, lang.window.to|0)) },
+    zones: lang.zones === 'ALL' ? 'ALL' : lang.zones.filter(z => ROOMS[z]),
+    actions: lang.actions.filter(a => ACTIONS[a]),
+    escort: !!lang.escort,
+    item: ITEM_WORDS.some(([, it]) => it === lang.item) ? lang.item : null,
+  };
+  if (!norm.actions.length) norm.actions = ['MOVE'];
+  if (norm.zones !== 'ALL' && !norm.zones.length) norm.zones = 'ALL';
+  return { ok: true, lang: norm, note: noteOf(norm) };
+}
+
+function compileRule(text) {
+  const src = String(text || '').trim();
+  if (src.length < 2) return { ok:false, error:'写一句话，至少两个字。' };
+  const window = parseTime(src);
+  let zones = [...new Set(ZONE_WORDS.filter(([re]) => re.test(src)).map(([, z]) => z))];
+  if (/全区域|所有区域|所有房间|整个监狱|全狱|各处|处处|每一间|任何地方|所有地方/.test(src) || zones.length === 0) zones = 'ALL';
+  let actions = [];
+  for (const [re, act] of ACTION_WORDS) if (re.test(src) && !actions.includes(act)) actions.push(act);
+  if (actions.length === 0) actions = ['MOVE'];
+  const escort = /两人同行|同行|两个人|两人一起|结伴|陪/.test(src);
+  const obj = (OBJECT_WORDS.find(([re]) => re.test(src)) || [])[1] || null;
+  const item = (ITEM_WORDS.find(([re]) => re.test(src)) || [])[1] || obj || null;
+  // 提到具体目标物时，「碰」就意味着取、撬、爬都算
+  if (obj) actions = ['TAKE', 'BREAK', 'CLIMB'].concat(actions.filter(a => a !== 'MOVE'));
+  const lang = { window, zones, actions, escort, item };
+  const note = noteOf(lang);
+  return { ok:true, rule:{ text:src, lang, note, leaks:0, broken:false }, note };
+}
+
+function ruleBlocks(rule, step, t) {
+  if (!inWindow(rule, t)) return false;
+  const { zones, actions, item } = rule.lang;
+  if (zones !== 'ALL' && !zones.includes(step.room)) return false;
+  if (!actions.includes(step.act)) return false;
+  if (item && item !== step.item) return false;
+  return true;
+}
+
+// 一条规矩「拦得住」的概率。
+// 写得越具体越硬：指定区域 + 有时段 = 一定拦得住；「全区域/全时段」这种大而空的规矩，狱警根本站不过来。
+function ruleStrength(state, rule) {
+  const { zones, window } = rule.lang;
+  const broad = zones === 'ALL' || (window.from === 0 && window.to === 1439);
+  let p = broad ? 0.55 : 1.0;
+  if (state.obedience < 45) p *= 0.55 + 0.45 * (state.obedience / 45);   // 服从度垮了，纸上的规矩就没人执行
+  if (state.blackout) p *= 0.70;
+  return Math.max(0.15, Math.min(1, p));
+}
+
+// ---------------- 局面 ----------------
+function createGame(seed = 1) {
+  let s = (seed >>> 0) || 1;
+  const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+  return {
+    rng, day:1, maxDays:7, ap:PARAMS.apPerDay, progress:null,
+    rules: [], obedience:100, fatigue:0, trust:60, hostility:30, despair:20,
+    prisoner:{ room:'cell3', items:[] },
+    prediction:null, warned:false, blackout:false, escaped:false, outcome:null,
+    tutorialPending:true, notes:[], nights:[],
+  };
+}
+const note = (st, text, kind='sys') => st.notes.push({ day:st.day, kind, text });
+
+function writeRule(state, text, compiled) {
+  if (state.rules.length >= PARAMS.rulesMax) return { ok:false, error:'六条规矩已经写满。' };
+  if (state.ap < 1) return { ok:false, error:'今天没有行动力了。' };
+  const c = (compiled && compiled.ok && compiled.lang)
+    ? { ok:true, rule:{ text, lang:compiled.lang, note:compiled.note, leaks:0, broken:false }, note:compiled.note }
+    : compileRule(text);
+  if (!c.ok) return c;
+  const rule = { ...c.rule, id:'r' + (state.rules.length + 1), day:state.day };
+  state.rules.push(rule);
+  state.ap -= 1;
+  const cost = PARAMS.obediencePerRule
+    + (rule.lang.zones === 'ALL' ? PARAMS.obedienceBroadZone : 0)
+    + (rule.lang.window.from === 0 && rule.lang.window.to === 1439 ? PARAMS.obedienceBroadTime : 0);
+  state.obedience = Math.max(PARAMS.obedienceFloor, state.obedience + cost);
+  state.hostility = Math.min(100, state.hostility + PARAMS.hostilityRule);
+  note(state, '狱警服从度 ' + cost + '，囚犯敌意 +10。', 'cost');
+  return { ok:true, rule, note:c.note };
+}
+
+function predict(state, routeId) {
+  const r = ROUTES.find(x => x.id === routeId);
+  if (!r) return { ok:false, error:'没有这条路。' };
+  state.prediction = routeId;
+  state.warned = true;   // 猜中了就是在他会走的那条路上多站了一班
+  return { ok:true, route:r };
+}
+
+function extraPatrol(state) {
+  if (state.ap < 2) return { ok:false, error:'加派夜巡要 2 点行动力。' };
+  state.ap -= 2; state.warned = true;
+  note(state, '你加派了一次夜巡。今晚狱警会多走两趟。', 'act');
+  return { ok:true };
+}
+
+// 把「他今晚还能走哪几条路」摆出来——这张清单就是交给 LLM 挑的那张
+function availableRoutes(state) {
+  return [...ROUTES, ...IMPROV.filter(r => state.hostility >= r.minHostility && (!r.minDay || state.day >= r.minDay))];
+}
+
+function enumerateHoles(state) {
+  const out = [];
+  for (const route of availableRoutes(state)) {
+    let t = PARAMS.nightStart, depth = 0, blockedAt = null, blockedBy = null, weakest = 1;
+    for (const step of route.steps) {
+      t += PARAMS.stepMinutes;
+      const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t) || ruleBlocks(r, step, t));
+      if (blk) { blockedAt = step.label; blockedBy = blk.text; weakest = ruleStrength(state, blk); break; }
+      depth++;
+    }
+    out.push({ id:route.id, name:route.name, intent:route.intent, impro:!!route.minHostility, open:depth === route.steps.length,
+      depth, total:route.steps.length, blockedAt, blockedBy, strength:weakest,
+      weight: depth / route.steps.length + (state.progress && state.progress.routeId === route.id ? 0.45 : 0) + (route.id === state.prediction ? 0.12 : 0) });
+  }
+  return out.sort((a, b) => b.weight - a.weight);
+}
+
+// ---------------- 一夜 ----------------
+function simulateNight(state, choice = {}) {
+  const rng = state.rng;
+  const events = [];
+  const route = availableRoutes(state).find(r => r.id === choice.routeId) || ROUTES[1];
+  const push = (t, kind, text, extra = {}) => events.push({ t:fmt(t), kind, text, ...extra });
+
+  state.blackout = state.day === 3;
+  let t = PARAMS.nightStart;
+  let outcome = 'idle';
+  const carried = new Set(state.prisoner.items);
+
+  push(t, 'start', '熄灯。');
+  if (state.blackout) push(t, 'event', DAY_EVENTS[3].text);
+  if (state.tutorialPending) push(t, 'note', '这是第一夜。他还在摸这间屋子。');
+
+  // 他昨天已经做完的步骤不会白做：接着上次的位置往下走
+  const done = (state.progress && state.progress.routeId === route.id) ? state.progress.done : 0;
+  let steps = route.steps.slice(done);
+  // 第一次上这条路线，一夜只做第一步——总得给你留一夜反应的时间
+  if (steps.length > 1) steps = steps.slice(0, 1);   // 一夜只走一步：每一步之间都得给你留反应时间
+  // 前三夜他还在摸：不做这条路线的最后一步
+  let scouted = false;
+  if (steps.length && done + steps.length === route.steps.length && state.day < PARAMS.escapeEarliestNight) {
+    steps = steps.slice(0, -1); scouted = true;
+  }
+
+  let lastRoom = null;
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    t += PARAMS.stepMinutes + Math.floor(rng() * 12);
+    if (step.room !== lastRoom) push(t, 'move', '他' + (step.room === 'corridor' ? '进了走廊' : '进了' + ROOMS[step.room].name) + '。');
+    lastRoom = step.room;
+
+    const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t)) ||
+                state.rules.find(r => ruleBlocks(r, step, t));
+    if (blk) {
+      const strength = ruleStrength(state, blk);
+      if (rng() < strength) {
+        const brave = state.hostility >= 70 || state.despair >= 75;
+        push(t, 'block', (brave ? '他在门口停住了' : '他在门口停了一会儿，回身走了') + '：「' + blk.text + '」。', { rule:blk.id });
+        outcome = i === 0 ? 'blocked' : 'partial';
+        break;
+      }
+      blk.leaks += 1;
+      push(t, 'leak', '他从规矩的缝里过去了——「' + blk.text + '」没拦住。', { rule:blk.id });
+    }
+
+    if (!state.blackout) {
+      const warnedNow = state.warned || state.prediction === route.id;
+      const cp = Math.min(0.9, PARAMS.catchBase + PARAMS.catchObedience * state.obedience / 100
+        + (warnedNow ? PARAMS.catchWarned : 0) + state.fatigue * PARAMS.catchFatigue);
+      if (rng() < cp) {
+        const blind = state.obedience < 40;
+        push(t, 'catch', blind ? '手电的光扫过来。狱警看了他一眼，把光挪开了。' : '手电筒的光扫过来。狱警抓住了他的胳膊。');
+        outcome = blind ? 'slip' : 'caught';
+        if (!blind) { carried.clear(); state.progress = null; }
+        break;
+      }
+    }
+
+    if (step.act === 'TAKE') carried.add(step.item);
+    push(t, 'done', '他' + step.label + '。');
+    state.progress = { routeId: route.id, done: done + i + 1 };
+    if (done + i + 1 === route.steps.length && state.day >= PARAMS.escapeEarliestNight) {
+      outcome = 'escape'; push(t, 'escape', '他从' + route.name + '出去了。');
+    }
+  }
+
+  if (scouted) push(t + PARAMS.stepMinutes, 'note', '他在' + route.name + '下面站了很久，最后回去了。');
+  const night = state.day;
+  state.prisoner.items = [...carried];
+  state.tutorialPending = false;
+  state.nights.push({ night, routeId:route.id, outcome, events:events.slice() });
+
+  if (outcome === 'escape') { state.escaped = true; state.outcome = 'escape'; }
+  else {
+    state.hostility = Math.min(100, state.hostility + (outcome === 'caught' ? PARAMS.hostilityCaught : PARAMS.hostilityBlocked) + (outcome === 'slip' ? PARAMS.hostilitySlip : 0));
+  // 一晚过去，怨气会散一点；一晚被干净地拦住，他会更信你一点
+  state.hostility = Math.max(0, state.hostility - 2);
+  if (outcome === 'blocked') state.trust = Math.min(100, state.trust + 3);
+  if (outcome === 'blocked' && rng() < 0.6) { state.progress = null; }   // 他发现这条路被堵死了，换一条
+    state.despair = Math.min(100, state.despair + (outcome === 'caught' ? PARAMS.despairCaught : PARAMS.despairBlocked));
+    state.fatigue = Math.min(100, state.fatigue + 6);
+    state.obedience = Math.max(PARAMS.obedienceFloor,
+      state.obedience + Math.round(PARAMS.obediencePerRulePerNight * 10 * state.rules.length) / 10);
+  }
+
+  const right = state.prediction === route.id;
+  if (right) state.ap = Math.min(PARAMS.apMax, PARAMS.apPerDay + 1);
+  else state.ap = PARAMS.apPerDay;
+  state.warned = false;   // 夜巡用完即止
+  state.prediction = null;
+  if (state.day < state.maxDays) state.day += 1;
+
+  return { route, outcome, events, predictedRight:right };
+}
+
+// ---------------- 结算 ----------------
+const TITLES = [
+  { cond:s => s.escaped,                        title:'失守',  sub:'他出去了。' },
+  { cond:s => !s.escaped && s.obedience < 35,   title:'空规矩', sub:'你写了六条，没人打算执行。' },
+  { cond:s => !s.escaped && s.trust >= 70 && s.hostility < 78, title:'记得', sub:'他没走，也没恨你。' },
+  { cond:s => !s.escaped && s.hostility >= 80,  title:'账本',  sub:'你赢了七天。他记了一辈子。' },
+  { cond:s => !s.escaped,                       title:'铁壁',  sub:'你关住了他，也关住了这间屋子。' },
+];
+
+function settle(state) {
+  const t = TITLES.find(x => x.cond(state)) || TITLES[TITLES.length - 1];
+  const leaked = state.rules.filter(r => r.leaks > 0).sort((a, b) => b.leaks - a.leaks)[0];
+  const quote = state.escaped
+    ? (leaked ? '「' + leaked.text + '」——你写了它，它漏了 ' + leaked.leaks + ' 次。' : '「你写了规矩，但没有一条真的挡住他。」')
+    : (leaked ? '「' + leaked.text + '」漏了 ' + leaked.leaks + ' 次。他最后还是没走。' : '他没走。你把门关上了，也把自己关在了里面。');
+  return { title:t.title, sub:t.sub, quote, escaped:state.escaped, day:Math.min(state.day, state.maxDays) };
+}
+
+const META = { ROOMS, ROUTES, ACTIONS, DAY_EVENTS, PARAMS };
+
+// day6「他病了」：两种处置
+function sickChoice(state, kind) {
+  if (state.day !== 6) return { ok:false, error:'还没到那一天。' };
+  if (kind === 'treat') {
+    state.trust = Math.min(100, state.trust + 12);
+    state.obedience = Math.min(100, state.obedience + 6);
+    note(state, '你叫了医生。他今天没力气恨你。', 'act');
+  } else {
+    state.prisoner.items = [];
+    state.obedience = Math.max(PARAMS.obedienceFloor, state.obedience - 4);
+    note(state, '你扣了他的行动。他记住了这一笔。', 'act');
+  }
+  return { ok:true };
+}
+
+M["engine"] = {MIN:MIN, ROOMS:ROOMS, ACTIONS:ACTIONS, PARAMS:PARAMS, ROUTES:ROUTES, IMPROV:IMPROV, DAY_EVENTS:DAY_EVENTS, fmt:fmt, inWindow:inWindow, noteOf:noteOf, ruleFromLang:ruleFromLang, compileRule:compileRule, ruleBlocks:ruleBlocks, ruleStrength:ruleStrength, createGame:createGame, writeRule:writeRule, predict:predict, extraPatrol:extraPatrol, availableRoutes:availableRoutes, enumerateHoles:enumerateHoles, simulateNight:simulateNight, settle:settle, META:META, sickChoice:sickChoice};
+})();
+/* ===== ui/npc.js ===== */
+(function(){
+// npc.js — 语言层。规则引擎算事实，LLM 只负责「把玩家的话编译成判定条」和「把漏洞写成一句话」。
+// 全部带回退：LLM 超时 / 报错 / 输出不合规 → 直接用确定性规则。
+  const { compileRule, ruleFromLang, noteOf, ROOMS, ACTIONS } = M["engine"];
+const params = new URLSearchParams(location.search);
+const LLM_ON = params.get('llm') !== '0';
+const llmOn = LLM_ON;
+const TIMEOUT = 14000;          // 挑路 / 一句话：等 14 秒，超过就降级
+const TIMEOUT_COMPILE = 34000;  // 编译：AI 核对可以晚，不挡玩家（本地判定先出）
+// 部署形态：游戏页在 /，Gradio 语言层挂在 /ui 下
+const NPC_API = '/gradio_api/call/npc';   // 魔搭 API Inference 冷启动可达 10s+，热了之后编译约 3–5s，所以前端不阻塞、只做「事后校准」
+
+async function ask(payload, timeout) {
+  const ac = new AbortController();
+  const t = setTimeout(function () { ac.abort(); }, timeout || TIMEOUT);
+  try {
+    // 创空间里：Gradio 的隐藏接口 /gradio_api/call/npc（SSE 返回）
+    const r = await fetch(NPC_API, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ data: [JSON.stringify(payload)] }), signal: ac.signal,
+    });
+    if (!r.ok) throw new Error('http ' + r.status);
+    const j = await r.json();
+    const ev = await fetch(NPC_API + '/' + j.event_id, { signal: ac.signal });
+    const txt = await ev.text();
+    const m = /event:\s*complete[\s\S]*?data:\s*(.+)/.exec(txt) || /data:\s*(.+)/.exec(txt);
+    if (!m) throw new Error('no sse data');
+    const arr = JSON.parse(m[1]);
+    const out = JSON.parse(arr[0]);
+    if (!out || out.ok === false) throw new Error((out && out.error) || 'llm fail');
+    return out;
+  } finally { clearTimeout(t); }
+}
+
+const ZONES = Object.keys(ROOMS), ACTS = Object.keys(ACTIONS), ITEMS = ['iron','sheet','rope','knife','key'];
+
+// 把一句话编译成判定条。LLM 给了合法结构就用它，否则用引擎的正则版。
+async function compileSmart(text) {
+  const local = compileRule(text);
+  if (!local.ok || !LLM_ON) return local;
+  try {
+    const j = await ask({ task:'compile', text, lang:{
+      rooms: ZONES.map(z => [z, ROOMS[z].name]), actions: ACTS.map(a => [a, ACTIONS[a]]), items: ITEMS,
+    }}, TIMEOUT_COMPILE);
+    const L = j && j.lang;
+    if (!L || !L.window || !Array.isArray(L.actions) || !L.actions.length) throw new Error('bad shape');
+    // 时间窗必须是合法区间：LLM 偶尔给出 0–0 这种空窗，直接用本地结果，别让它把规矩废掉
+    // 引擎的时间窗支持跨夜（from > to），所以只禁止空窗和越界，不要求 to > from
+    const wf = Number(L.window.from), wt = Number(L.window.to);
+    if (!(wf >= 0 && wf <= 1439 && wt >= 0 && wt <= 1439) || wf === wt) throw new Error('bad window');
+    const fixed = ruleFromLang(text, {
+      window: L.window, zones: L.zones === 'ALL' ? 'ALL' : (Array.isArray(L.zones) ? L.zones : 'ALL'),
+      actions: L.actions, escort: L.escort, item: ITEMS.includes(L.item) ? L.item : null,
+    });
+    // 双保险：本地能编译出具体区域/时间时，与 LLM 结果取「更具体」的一方
+    const best = pickStricter(local, fixed);
+    return { ok: true, rule: { text, lang: best.lang, note: best.note, leaks: 0, broken: false }, note: best.note, by: 'llm' };
+  } catch (err) {
+    return { ...local, by: 'local', degraded: true };
+  }
+}
+
+function spec(l) {
+  const broadZone = l.zones === 'ALL' ? 1 : 0;
+  const broadTime = (l.window.from === 0 && l.window.to === 1439) ? 1 : 0;
+  return broadZone + broadTime;
+}
+function pickStricter(a, b) {
+  const A = { lang: a.rule.lang, note: a.note }, B = { lang: b.lang, note: b.note };
+  return spec(B.lang) <= spec(A.lang) ? B : A;
+}
+
+// 把引擎算出的漏洞清单写成一句人话（他今晚想干什么）。失败就用模板。
+async function chooseHole(holes, state) {
+  const top = holes[0];
+  if (!LLM_ON || !top) return { id: top && top.id, line: top && template(top), by: 'local' };
+  try {
+    const j = await ask({ task:'choose', holes: holes.slice(0, 6).map(h => ({ id:h.id, name:h.name, depth:h.depth, total:h.total, blockedAt:h.blockedAt })), day: state.day });
+    const hit = holes.find(h => h.id === (j && j.id));
+    return { id: (hit || top).id, by: 'llm', line: (j && typeof j.line === 'string' && j.line.length < 40) ? j.line : template(top) };
+  } catch (e) {
+    return { id: top.id, line: template(top), by: 'local', degraded: true };
+  }
+}
+function template(h) {
+  if (h.open) return '他知道 ' + h.name + '，今晚就去试试。';
+  return '他试过 ' + h.name + '，被' + (h.blockedAt || '规矩') + '拦住过一次。';
+}
+
+// 夜里的一句话：他今晚走的是哪条路、被哪条规矩拦过。
+// 只写一句，不下判断 —— 判定全部在引擎里，这里只负责「像个人」。
+async function remark(state, ctx) {
+  const tpl = templateNight(ctx);
+  if (!LLM_ON) return { line: tpl, by: 'local' };
+  try {
+    const j = await ask({
+      task: 'remark',
+      state: {
+        day: state.day,
+        rules: (state.rules || []).map(r => ({ text: r.text })),
+        route: ctx.routeName, outcome: ctx.outcome, blocked: ctx.blocked || '',
+      },
+    });
+    const line = j && typeof j.line === 'string' ? j.line.trim() : '';
+    if (!line || Array.from(line).length > 32) throw new Error('bad line');
+    return { line, by: 'llm' };
+  } catch (e) {
+    return { line: tpl, by: 'local', degraded: true };
+  }
+}
+
+function templateNight(ctx) {
+  if (ctx.outcome === 'escape') return '门开着，风是从外面进来的。';
+  if (ctx.outcome === 'caught') return '他被按住的时候没有挣扎，只是看着灯。';
+  if (ctx.outcome === 'slip') return '灯挪开了。他站在原地没动。';
+  if (ctx.outcome === 'blocked') return '他在门口站了一会儿，把手插回兜里。';
+  return '他把床板翻过来，又翻了回去。';
+}
+
+// 预热：页面加载时先戳一下模型，免得玩家写第一条规矩时刚好撞上冷启动。失败无所谓。
+function warm() {
+  if (!LLM_ON) return;
+  fetch(NPC_API, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ data: [JSON.stringify({ task: 'warm' })] }),
+  }).catch(function () {});
+}
+M["npc"] = {llmOn:llmOn, compileSmart:compileSmart, chooseHole:chooseHole, remark:remark, warm:warm};
+})();
+/* ===== ui/screen.js ===== */
+(function(){
+// screen.js — 把 state 渲染成一整屏 SVG。纯函数，无副作用，可在 node 里跑（给截图用）。
+  const { C, KAI, SONG, buildDefs, buildPaper } = M["paper"];
+const W = 1600, H = 1000;
+const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+
+function cn(n) { return n <= 10 ? CN[n] : CN[Math.floor(n / 10)] + CN[n % 10]; }
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+function T(x, y, s, o) {
+  o = o || {};
+  const a = ['x="' + x + '"', 'y="' + y + '"', 'font-size="' + (o.size || 16) + '"',
+    'fill="' + (o.fill || C.INK2) + '"', 'font-family="' + (o.font || SONG) + '"'];
+  if (o.anchor) a.push('text-anchor="' + o.anchor + '"');
+  if (o.tracking != null) a.push('letter-spacing="' + o.tracking + '"');
+  if (o.opacity != null) a.push('opacity="' + o.opacity + '"');
+  if (o.weight) a.push('font-weight="' + o.weight + '"');
+  return '<text ' + a.join(' ') + '>' + esc(s) + '</text>';
+}
+// 按字宽硬折行（中文方块字，够用）
+function wrap(s, max) {
+  if (!s) return [];
+  const out = [];
+  let cur = '';
+  for (const ch of String(s)) {
+    if (ch === '\n') { out.push(cur); cur = ''; continue; }
+    cur += ch;
+    if (cur.length >= max) { out.push(cur); cur = ''; }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+// ---- 各区块 ----------------------------------------------------------------
+function header(st) {
+  const ap = Math.max(0, Math.min(st.apMax || 3, st.ap == null ? 3 : st.ap));
+  let dots = '';
+  for (let i = 0; i < (st.apMax || 3); i++) {
+    const x = 1468 - 7 - ((st.apMax || 3) - 1 - i) * 20;
+    dots += i < ap
+      ? '<circle cx="' + x + '" cy="118" r="6.4" fill="' + C.RED + '"/>'
+      : '<circle cx="' + x + '" cy="118" r="6.4" fill="none" stroke="' + C.MUTED + '" stroke-width="1" opacity="0.75"/>';
+  }
+  const day = st.day || 1;
+  return `
+  <g id="head">
+    ${T(132, 84, '案 卷 No.07 / 19', { size: 13, tracking: 2, fill: C.INK })}
+    ${T(132, 112, '脱逃事件调查报告 · 内部资料', { size: 12, fill: C.MUTED, tracking: 0.5 })}
+    <text x="800" y="86" text-anchor="middle" font-family="${SONG}" font-size="26" fill="${C.INK}" letter-spacing="3">第<tspan fill="${C.RED}" font-family="${KAI}" font-size="31" dx="6" dy="-1">${cn(day)}</tspan><tspan dx="8" dy="1">天</tspan></text>
+    ${T(800, 128, '共 七 日', { size: 11, anchor: 'middle', tracking: 6, fill: C.MUTED })}
+    ${T(1468, 84, '剩余行动力', { size: 11, anchor: 'end', fill: C.MUTED, tracking: 1 })}
+    ${dots}
+    <line x1="132" y1="170" x2="1468" y2="170" stroke="${C.INK2}" stroke-width="0.9" opacity="0.55"/>
+    <line x1="132" y1="172.5" x2="1468" y2="172.5" stroke="${C.INK2}" stroke-width="0.5" opacity="0.28"/>
+  </g>`;
+}
+
+function rulesPanel(st) {
+  const rules = (st.rules || []).slice(0, 6);
+  const ring = ['①', '②', '③', '④', '⑤', '⑥'];
+  let g = '';
+  for (let i = 0; i < 6; i++) {
+    const y = 238 + i * 62;
+    g += T(1158, y, ring[i], { size: 16, fill: rules[i] ? C.INK : C.MUT2 });
+    if (rules[i]) {
+      const n = Array.from(rules[i].text).length;
+      const size = n <= 16 ? 17 : n <= 19 ? 15 : n <= 23 ? 13.5 : 12.5;
+      const per = Math.floor(286 / size);
+      const lines = wrap(rules[i].text, per).slice(0, 2);
+      const isLong = lines.length > 1;
+      g += T(1182, y, lines[0], { size: size, font: KAI, fill: C.INK });
+      if (isLong) g += T(1182, y + size + 2, lines[1], { size: size, font: KAI, fill: C.INK });
+      const ny = isLong ? y + size * 2 + 4 : y + 24;
+      g += T(1184, ny, '▶', { size: 9, fill: C.WARM });
+      g += T(1198, ny, rules[i].note || '全时段 · 全区域 · 无例外', { size: 10.5, fill: C.WARM, tracking: 0.6 });
+    } else {
+      g += '<g class="slot" data-act="write" data-slot="' + i + '" style="cursor:pointer">';
+      g += '<rect x="1150" y="' + (y - 26) + '" width="322" height="34" fill="#000" opacity="0.001"/>';
+      g += '<line x1="1184" y1="' + (y - 3) + '" x2="1468" y2="' + (y - 3) + '" stroke="' + C.MUTED + '" stroke-width="0.9" stroke-dasharray="3 5" opacity="0.45"/>';
+      g += '<text x="1268" y="' + (y - 8) + '" font-size="10.5" fill="' + C.MUT2 + '" opacity="0.55" letter-spacing="3">写一条规矩</text>';
+      g += '</g>';
+    }
+  }
+  return `
+  <g id="rules">
+    ${T(1158, 186, '狱 规', { size: 15, fill: C.INK, tracking: 8 })}
+    ${T(1468, 190, '至多六条', { size: 10, anchor: 'end', fill: C.MUT2, tracking: 2 })}
+    ${g}
+    <line x1="1158" y1="654" x2="1468" y2="654" stroke="${C.INK2}" stroke-width="0.7" opacity="0.3"/>
+    ${T(1158, 672, '状 态', { size: 10, fill: C.MUTED, tracking: 6 })}
+    ${gauge(1158, 708, '狱警服从度', st.obedience == null ? 70 : st.obedience, C.BRASS)}
+    ${gauge(1158, 742, '囚犯敌意', st.hostility == null ? 42 : st.hostility, C.RED)}
+  </g>`;
+}
+
+function gauge(x, y, label, v, color) {
+  const w = 176, bx = 1258, bw = 178;
+  const p = Math.max(0, Math.min(100, v)) / 100;
+  return `
+  ${T(x, y, label, { size: 11.5, fill: C.MUTED, tracking: 1 })}
+  <rect x="${bx}" y="${y - 6}" width="${bw}" height="5" fill="${C.INK}" opacity="0.14"/>
+  <rect x="${bx}" y="${y - 6}" width="${(bw * p).toFixed(1)}" height="5" fill="${color}"/>
+  ${T(1468, y, Math.round(v), { size: 12, anchor: 'end', fill: C.INK2 })}`;
+}
+
+function report(st) {
+  const lines = st.report || [];
+  const rows = [];
+  let y = 792;
+  for (const r of lines.slice(0, 5)) {
+    const parts = wrap(r.text, 36);
+    rows.push(T(252, y, r.t || '', { size: 12, fill: C.MUTED, tracking: 0.5 }));
+    parts.slice(0, 2).forEach(function (p, i) {
+      rows.push(T(306, y + i * 22, p, { size: 15.5, font: KAI, fill: i ? C.MUTED : C.INK2 }));
+    });
+    y += 22 * Math.min(2, parts.length) + 10;
+  }
+  const day = st.day || 1;
+  return `
+  <g id="report">
+    <line x1="132" y1="752" x2="1468" y2="752" stroke="${C.INK2}" stroke-width="0.8" opacity="0.4"/>
+    ${T(132, 776, '巡 查 报 告', { size: 13, fill: C.INK, tracking: 4 })}
+    ${T(132, 924, '值 班 人', { size: 10, fill: C.MUT2, tracking: 3 })}
+    ${T(196, 924, '李', { size: 15, font: KAI, fill: C.INK2 })}
+    <line x1="216" y1="927" x2="330" y2="927" stroke="${C.INK2}" stroke-width="0.7" opacity="0.4"/>
+    ${T(1468, 924, '第 ' + cn(day) + ' 页 / 共 七 页', { size: 11, anchor: 'end', fill: C.MUT2, tracking: 3 })}
+    ${rows.join('')}
+    <g id="report-live"></g>
+  </g>`;
+}
+
+function seal(st) {
+  const label = st.phase === 'night' ? '夜 里' : '入 夜';
+  const cx = 1418, cy = 812;
+  return `
+  <g id="act-night" class="hit" data-act="night" transform="translate(${cx} ${cy}) rotate(-9)" style="cursor:pointer">
+    <rect x="-50" y="-50" width="100" height="100" fill="#c9b48a" opacity="0.001"/>
+    <rect x="-42" y="-42" width="84" height="84" fill="none" stroke="${C.REDD}" stroke-width="3" opacity="0.9"/>
+    <rect x="-36" y="-36" width="72" height="72" fill="none" stroke="${C.REDD}" stroke-width="1" opacity="0.75"/>
+    <text x="0" y="9" text-anchor="middle" font-family="${KAI}" font-size="23" fill="${C.REDD}" letter-spacing="2">${label}</text>
+  </g>`;
+}
+
+// ---- 结算页：整屏判决书（这张图就是传播物料） ----
+function settlePage(st) {
+  const s = st.settle || {};
+  const rules = (st.rules || []);
+  let rl = '';
+  for (let i = 0; i < 6; i++) {
+    const y = 452 + i * 40;
+    rl += T(430, y, ['①','②','③','④','⑤','⑥'][i], { size: 14, fill: rules[i] ? C.INK : C.MUT2 });
+    if (rules[i]) {
+      rl += T(456, y, rules[i].text, { size: 15.5, font: KAI, fill: C.INK2 });
+    } else {
+      rl += '<line x1="456" y1="' + (y - 4) + '" x2="1160" y2="' + (y - 4) + '" stroke="' + C.MUTED + '" stroke-width="0.8" stroke-dasharray="3 5" opacity="0.4"/>';
+    }
+  }
+  const sc = st.settleStats || {};
+  return `
+  <g id="settle">
+    <rect x="0" y="0" width="${W}" height="${H}" fill="#14110e" opacity="0.68"/>
+    <rect x="300" y="96" width="1000" height="810" fill="${C.PAPER}"/>
+    <rect x="300" y="96" width="1000" height="810" fill="#b48d54" opacity="0.08" filter="url(#blotch)"/>
+    <rect x="300.5" y="96.5" width="999" height="809" fill="none" stroke="#6b5a3e" stroke-width="1.2" opacity="0.55"/>
+    <rect x="314.5" y="110.5" width="971" height="781" fill="none" stroke="#6b5a3e" stroke-width="0.7" opacity="0.4"/>
+    ${T(800, 186, '判 决 书', { size: 13, fill: C.MUTED, anchor: 'middle', tracking: 12 })}
+    ${T(800, 292, s.title || '', { size: 62, font: KAI, fill: C.RED, anchor: 'middle', tracking: 18 })}
+    ${T(800, 340, s.sub || '', { size: 15, fill: C.INK2, anchor: 'middle', tracking: 3 })}
+    <line x1="600" y1="374" x2="1000" y2="374" stroke="${C.INK2}" stroke-width="0.7" opacity="0.35"/>
+    ${T(430, 412, '六 条 规 矩', { size: 11, fill: C.MUT2, tracking: 6 })}
+    ${rl}
+    <line x1="430" y1="706" x2="1160" y2="706" stroke="${C.INK2}" stroke-width="0.7" opacity="0.32"/>
+    ${T(430, 752, (s.quote || '').replace(/^——/, '——'), { size: 16, font: KAI, fill: C.INK, })}
+    ${T(1160, 800, sc.days || '', { size: 12, fill: C.MUTED, anchor: 'end', tracking: 2 })}
+    ${sc.ai ? T(430, 828, sc.ai, { size: 10.5, fill: C.MUT2, tracking: 1 }) : ''}
+    ${T(430, 800, '狱警服从度 ' + (sc.obedience == null ? '' : sc.obedience) + '　囚犯敌意 ' + (sc.hostility == null ? '' : sc.hostility), { size: 12, fill: C.MUTED, tracking: 2 })}
+    ${T(360, 150, '案 卷 No.07 / 19', { size: 10, fill: C.MUT2, tracking: 2 })}
+    <g transform="translate(1180 700) rotate(-11)">
+      <rect x="-52" y="-52" width="104" height="104" fill="none" stroke="${C.REDD}" stroke-width="3.4" opacity="0.85"/>
+      <rect x="-45" y="-45" width="90" height="90" fill="none" stroke="${C.REDD}" stroke-width="1.1" opacity="0.7"/>
+      <text x="0" y="8" text-anchor="middle" font-family="${KAI}" font-size="26" fill="${C.REDD}" letter-spacing="2" opacity="0.9">查 讫</text>
+    </g>
+    <g data-act="again" style="cursor:pointer" transform="translate(800 862)">
+      <rect x="-110" y="-22" width="220" height="44" fill="#000" opacity="0.001"/>
+      ${T(0, 6, '再 来 一 局', { size: 14, fill: C.MUTED, anchor: 'middle', tracking: 5 })}
+    </g>
+  </g>`;
+}
+
+// ---- 夜：熄灯 + 灯光光斑 + 昨夜路径 -----------------------------------------
+function nightLayer(st) {
+  const p = (st && st.path) || [];
+  if (!p.length) return '';
+  const d = p.map(function (q, i) { return (i ? 'L' : 'M') + q[0] + ' ' + q[1]; }).join(' ');
+  const defs =
+    '<defs>' +
+    '<radialGradient id="lampmask" cx="50%" cy="50%" r="50%">' +
+    '<stop offset="0" stop-color="#000"/><stop offset="0.5" stop-color="#000"/><stop offset="1" stop-color="#fff"/>' +
+    '</radialGradient>' +
+    '<filter id="nsoft" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="18"/></filter>' +
+    '<mask id="nightmask" maskUnits="userSpaceOnUse" x="0" y="0" width="' + W + '" height="' + H + '">' +
+    '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#fff"/>' +
+    '<g filter="url(#nsoft)">' +
+    '<ellipse cx="612" cy="452" rx="404" ry="282" fill="url(#lampmask)"/>' +
+    '<rect x="146" y="770" width="970" height="128" fill="#6a6a6a"/>' +
+    '</g>' +
+    '</mask>' +
+    '</defs>';
+  const dim = '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#0b0805" opacity="0.74" mask="url(#nightmask)"/>';
+  const line =
+    '<g transform="translate(204,182) scale(1.0726)">' +
+    '<path d="' + d + '" fill="none" stroke="#f2e6cf" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.10"/>' +
+    '<path id="np" d="' + d + '" pathLength="100" fill="none" stroke="#a33323" stroke-width="2.2" ' +
+    'stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="100" stroke-dashoffset="0" opacity="0.92"/>' +
+    '<g class="nptok"><use href="#token-prisoner" transform="translate(-345 -250)"/>' +
+    '<animateMotion dur="2s" fill="freeze" path="' + d + '"/></g>' +
+    '</g>';
+  return defs + dim + line;
+}
+// ---- 主渲染 ----------------------------------------------------------------
+async function renderScreen(st) {
+  st = st || {};
+  let map = '';
+  try {
+    const mapMod = M.map;
+    map = mapMod.buildMap({ night: st.phase === 'night' || st.phase === 'settle', path: st.path || null, tokens: st.tokens || null });
+  } catch (e) {
+    map = fallbackMap(st);
+  }
+  const nightCls = st.phase === 'night' ? 'night' : '';
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" class="${nightCls}" font-family="${SONG}">
+  ${buildDefs()}
+  ${buildPaper(W, H)}
+  ${header(st)}
+  <g id="mapwrap" transform="translate(204,182) scale(1.0726)">
+    <g id="mapbox">${map}</g>
+  </g>
+  <line x1="1132" y1="182" x2="1132" y2="738" stroke="${C.INK2}" stroke-width="0.7" opacity="0.22"/>
+  ${rulesPanel(st)}
+  ${report(st)}
+  ${st.phase === 'night' ? nightLayer(st) : ''}
+  ${st.phase === 'settle' ? settlePage(st) : seal(st)}
+</svg>`;
+}
+
+function fallbackMap(st) {
+  const p = (st && st.path) || [];
+  const d = p.map(function (q, i) { return (i ? 'L' : 'M') + q[0] + ' ' + q[1]; }).join(' ');
+  return '<g id="mapbox-inner">' +
+    '<rect width="558" height="520" fill="none" stroke="' + C.INK2 + '" stroke-width="1.2" opacity="0.25"/>' +
+    '<text x="279" y="270" text-anchor="middle" font-size="15" fill="' + C.MUTED + '">地图加载中…</text>' +
+    (p.length > 1 ? '<g id="nightpath"><path class="trail" d="' + d + '" fill="none" stroke="#882e1f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" opacity="0.8"/></g>' : '') +
+    '</g>';
+}
+
+M["screen"] = {W:W, cn:cn, renderScreen:renderScreen};
+})();
+/* ===== ui/app.js ===== */
+(function(){
+// app.js — 游戏主控。渲染归 screen.js，判定归 engine.js，语言归 npc.js。
+  const { renderScreen } = M["screen"];
+  const E = M["engine"];
+  const { compileSmart, chooseHole, remark, warm, llmOn } = M["npc"];
+const stage = document.getElementById('screen');
+const ov = document.getElementById('overlay');
+const CN = ['零', '一', '二', '三', '四', '五', '六', '七'];
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+// 演示与自动化测试用：?speed=0.1 把整夜的等待压到十分之一
+const SPEED = Math.max(0.02, Math.min(4, +(new URLSearchParams(location.search).get('speed') || 1)));
+const wait = (ms) => sleep(ms * SPEED);
+
+let g = null, view = null, busy = false, wroteToday = false;
+// 给评审看的一行账：这一局 AI 出了多少次手、其中多少次真的生效（失败就是降级成规则）
+let aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
+
+const FALLBACK = {
+  cell3:[120,300], cell1:[120,120], cell2:[120,210], corridor:[380,250], workshop:[560,100],
+  medical:[560,170], dining:[560,240], laundry:[560,310], storage:[120,430], yard:[560,400],
+};
+
+// ---------- 小工具 ----------
+function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function toast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.style.cssText = 'position:absolute;left:50%;bottom:6%;transform:translateX(-50%);pointer-events:none;' +
+      'background:rgba(34,29,25,.9);color:#f0e6d0;font-size:13px;letter-spacing:2px;padding:9px 18px;' +
+      'font-family:var(--song);z-index:9;transition:opacity .3s;border:1px solid rgba(240,230,208,.25)';
+    ov.appendChild(el);
+  }
+  el.textContent = msg;
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 1800);
+}
+
+function openSheet(html) {
+  ov.innerHTML = '<div class="scrim"><div class="sheet">' + html + '</div></div>';
+  return ov.querySelector('.sheet');
+}
+function closeSheet() { ov.innerHTML = ''; }
+ov.addEventListener('click', (ev) => {
+  if (ev.target.classList.contains('scrim')) closeSheet();
+});
+
+// ---------- 视图同步 ----------
+function syncView() {
+  view.day = g.day; view.ap = g.ap; view.apMax = E.PARAMS.apPerDay;
+  view.obedience = Math.round(g.obedience); view.hostility = Math.round(g.hostility);
+  view.rules = g.rules.map((r) => ({ text: r.text, note: r.note }));
+}
+async function paint() { stage.innerHTML = await renderScreen(view); }
+async function centers() {
+  try {
+    const mapMod = M.map;
+    if (mapMod.ROOM_RECTS) {
+      const o = {};
+      for (const k in mapMod.ROOM_RECTS) {
+        const r = mapMod.ROOM_RECTS[k];
+        const x = Array.isArray(r) ? r[0] : r.x, y = Array.isArray(r) ? r[1] : r.y;
+        const w = Array.isArray(r) ? r[2] : r.w, h = Array.isArray(r) ? r[3] : r.h;
+        o[k] = [x + w / 2, y + h / 2];
+      }
+      return o;
+    }
+  } catch (err) {}
+  return FALLBACK;
+}
+async function pathFor(route) {
+  // 优先用地图预先画好的、穿门过廊的折线；没有就退回房间中心连线
+  try {
+    const mapMod = M.map;
+    const p = mapMod.MAP_PATHS && mapMod.MAP_PATHS[route.id];
+    if (p && p.length > 1) return p;
+  } catch (err) {}
+  const c = await centers();
+  const pts = [c.cell3];
+  for (const st of route.steps) pts.push(c[st.room] || c.corridor);
+  return pts;
+}
+
+// ---------- 开局 ----------
+function newGame() {
+  const m = /[?&]seed=(\d+)/.exec(location.search);
+  g = E.createGame(m ? +m[1] : (Date.now() % 90000) + 1000);
+  view = { phase:'day', day:1, ap:3, apMax:3, obedience:100, hostility:30, rules:[], report:[], path:null, tokens:null };
+  wroteToday = false;
+  aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
+  dayBriefing();
+  paint();
+  if (g.day === 6) askSick();
+}
+
+function dayBriefing() {
+  syncView();
+  view.phase = 'day'; view.path = null; view.tokens = null;
+  const d = g.day;
+  let lines = [];
+  const last = g.nights[g.nights.length - 1];
+  if (last) {
+    const pick = (k) => last.events.filter((e) => e.kind === k)[0];
+    const out = { blocked:'他被拦住了。', partial:'他走到一半，退了回去。', caught:'他被抓了回来。',
+      slip:'狱警看了他一眼，把光挪开了。', escape:'他出去了。', idle:'今夜什么也没发生。' }[last.outcome] || '';
+    const mv = pick('move');
+    const act = last.events.filter((e) => ['take','break','climb','steal','note'].indexOf(e.kind) >= 0)[0];
+    if (last.outcome === 'idle' && !mv) lines.push({ t:'昨夜', text: out });
+    else if (mv) { lines.push({ t:'昨夜', text: mv.text }); if (act) lines.push({ t:'', text: act.text }); }
+    else lines.push({ t:'昨夜', text: out });
+  }
+  if (d === 1) lines = [
+    { t:'', text:'七天。你有六条规矩，和一个每天夜里都在找缝的人。' },
+    { t:'', text:'写一条规矩，然后按右下角的「入夜」。' },
+  ];
+  else if (d === 3) lines.push({ t:'22:30', text: E.DAY_EVENTS[3].text });
+  else if (d === 5) lines.push({ t:'17:00', text: E.DAY_EVENTS[5].text });
+  else if (d === 6) lines.push({ t:'15:00', text: E.DAY_EVENTS[6].text });
+  else if (d !== 1) lines.push({ t:'', text:'第 ' + CN[d] + ' 天。他今天话少。' });
+  view.report = lines.slice(0, 4);
+}
+
+// ---------- 写规矩 ----------
+const EXAMPLES = [
+  '入夜后，任何人不得离开自己的房间。',
+  '医务室的窗，任何时候都不许碰。',
+  '工具间的铁器，全天不许取走。',
+];
+
+async function askWrite() {
+  if (busy) return;
+  if (g.rules.length >= E.PARAMS.rulesMax) return toast('六条规矩已经写满了。');
+  if (g.ap < 1) return toast('今天的行动力用完了。');
+  const sheet = openSheet(
+    '<h3>写 一 条 规 矩</h3>' +
+    '<p class="sub">一句话说清楚：什么时候 · 在哪儿 · 不许做什么</p>' +
+    '<textarea id="rtxt" maxlength="60" placeholder="例：夜里不许离开牢房"></textarea>' +
+    '<p class="hint">写得越具体越拦得住；写得越宽，狱警越不服从。</p>' +
+    '<div class="examples" id="exs">' + EXAMPLES.map((x) => '<span>' + x + '</span>').join('') + '</div>' +
+    '<div class="row"><button class="btn ghost" data-k="cancel">不写了</button>' +
+    '<button class="btn primary" data-k="compile">归 档</button></div>'
+  );
+  const ta = sheet.querySelector('#rtxt');
+  ta.focus();
+  sheet.querySelector('#exs').addEventListener('click', (ev) => {
+    if (ev.target.tagName === 'SPAN') { ta.value = ev.target.textContent; ta.focus(); }
+  });
+  ta.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); doCompile(); } });
+  sheet.addEventListener('click', (ev) => {
+    const k = ev.target.dataset && ev.target.dataset.k;
+    if (k === 'cancel') closeSheet();
+    if (k === 'compile') doCompile();
+  });
+  async function doCompile() {
+    const text = ta.value.trim();
+    if (text.length < 4) return toast('再写长一点。');
+    // 先出确定性的判定条（规则引擎，0ms），AI 随后在后台核对一遍——不挡玩家
+    let local;
+    try { local = E.compileRule(text); } catch (err) { local = { ok: false, error: '这句判不了。' }; }
+    if (!local.ok) return toast(local.error || '这句判不了。');
+    const idx = g.rules.length;
+    showVerdict(sheet, text, local, llmOn);
+    compileSmart(text).then(function (r) {
+      if (!r || !r.ok || r.by !== 'llm') return;
+      // 浮层还开着：直接换判定条 + AI 标签
+      const nEl = sheet.querySelector('.verdict .n');
+      if (nEl && document.body.contains(sheet)) {
+        nEl.innerHTML = esc(r.note) + '<span class="ai-tag">AI 校准</span>';
+        sheet.__result = r;
+        const pend = sheet.querySelector('.ai-pend');
+        if (pend) pend.remove();
+        return;
+      }
+      // 玩家已经写下去了：规矩已经进册，把它的判定条就地更新
+      const rule = g.rules[idx];
+      if (rule && rule.text === text) {
+        rule.lang = r.rule ? r.rule.lang : rule.lang;
+        rule.note = r.note;
+        if (view.phase === 'day' && !busy) { syncView(); paint(); }
+      }
+    }).catch(function () {});
+  }
+}
+
+function showVerdict(sheet, text, r, pending) {
+  sheet.__result = r;
+  sheet.innerHTML =
+    '<h3>归 档 完 毕</h3>' +
+    '<p class="sub">你的话被译成了一条能执行的判定</p>' +
+    '<div class="verdict"><div class="q">' + esc(text) + '</div>' +
+    '<div class="n">' + esc(r.note) + '</div>' +
+    (pending ? '<div class="ai-pend">AI 正在核对这条规矩的判定…</div>' : '') + '</div>' +
+    '<p class="hint" style="margin-top:14px">' + costHint(r) + '</p>' +
+    '<div class="row"><button class="btn ghost" data-k="back">改 写</button>' +
+    '<button class="btn primary" data-k="ok">写 下</button></div>';
+  sheet.querySelector('[data-k="back"]').addEventListener('click', () => { closeSheet(); askWrite(); });
+  sheet.querySelector('[data-k="ok"]').addEventListener('click', async () => {
+    const rr = sheet.__result || r;
+    const w = E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note });
+    if (!w.ok) return toast(w.error);
+    wroteToday = true;
+    closeSheet();
+    syncView();
+    const last = g.rules[g.rules.length - 1];
+    view.report = [
+      { t:'归档', text:'「' + last.text + '」' },
+      { t:'', text: last.note },
+      { t:'', text:'狱警服从度 ' + Math.round(g.obedience) + '，囚犯敌意 ' + Math.round(g.hostility) + '。' },
+    ];
+    await paint();
+  });
+}
+
+function costHint(r) {
+  const l = r.rule ? r.rule.lang : r.lang;
+  const broad = l.zones === 'ALL' || (l.window.from === 0 && l.window.to === 1439);
+  return broad
+    ? '这条规矩管得太宽了。狱警会照办，但不会认真照办——服从度会掉得更快。'
+    : '这条规矩写得很具体。具体就意味着他真的会去执行。';
+}
+
+// ---------- 预判 + 入夜 ----------
+async function askNight() {
+  if (busy) return;
+  if (g.day === 5 && !wroteToday) return toast('今晚上级检查：你必须再写一条规矩。');
+  const sheet = openSheet(
+    '<h3>今 夜 他 会 试 哪 条 路</h3>' +
+    '<p class="sub">猜中：明天多 1 点行动力，狱警也会多站一班</p>' +
+    '<div class="chips">' + E.ROUTES.map((r) => {
+      const hole = E.enumerateHoles(g).find((h) => h.id === r.id) || {};
+      return '<div class="chip" data-k="pred" data-id="' + r.id + '"><div><div class="nm">' + r.name +
+        '</div><div class="in">' + (hole.open ? '这条路是通的' : '卡在：' + (hole.blockedAt || '')) + '</div></div></div>';
+    }).join('') + '</div>' +
+    '<div class="row"><button class="btn ghost" data-k="skip">不猜，直接入夜</button></div>'
+  );
+  sheet.addEventListener('click', (ev) => {
+    const el = ev.target.closest ? ev.target.closest('.chip') : null;
+    const k = ev.target.dataset && ev.target.dataset.k;
+    if (el) { closeSheet(); E.predict(g, el.dataset.id); runNight(); }
+    else if (k === 'skip') { closeSheet(); runNight(); }
+  });
+}
+
+async function runNight() {
+  busy = true;
+  const holes = E.enumerateHoles(g);
+  // AI 的「决定」：引擎先把所有真实漏洞算清，LLM 只能在这张清单里挑一条最像人的；
+  // 挑完仍由引擎逐条校验、执行。关掉 AI（?llm=0）就退回「第一条最松的路」，这就是 ablation。
+  // 与动画并行：让 AI 挑路线的时间藏在「熄灯 + 画夜路」的 2 秒里
+  const pickP = chooseHole(holes, g).catch(() => null);
+  const guess = holes[0].id;
+  const route0 = E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1];
+  view.phase = 'night'; syncView();
+  view.path = await pathFor(route0);
+  view.report = [];
+  await paint();
+  await wait(2100);
+  const pick = await pickP;
+  aiStat.picks += 1;
+  if (pick && pick.by === 'llm') aiStat.picksLLM += 1;
+  const actual = (pick && pick.id) || guess;
+  const route = E.availableRoutes(g).find((r) => r.id === actual) || E.ROUTES[1];
+  if (actual !== guess && route !== route0) {
+    view.path = await pathFor(route);
+    await paint();
+    await wait(900);
+  }
+
+  const res = E.simulateNight(g, { routeId: actual });
+  // AI 只写「他今晚的样子」这一句。判定、路线、结局全在引擎里，AI 没有权限改任何数值。
+  // 与逐条打印并行：打印完它刚好回来，不额外等；关掉 AI 或超时就用模板句。
+  const blk = res.events.find((e) => e.kind === 'block');
+  const remarkP = remark(g, {
+    routeName: res.route.name, outcome: res.outcome, blocked: blk ? blk.text : '',
+  }).catch(() => null);
+  const live = stage.querySelector('#report-live');
+  let y = 792;
+  for (const ev of res.events) {
+    if (y > 906) break;
+    appendLine(live, ev, y);
+    y += ev.kind === 'escape' ? 34 : 30;
+    await wait(ev.kind === 'escape' ? 1100 : 760);
+  }
+  // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。
+  const rk = await Promise.race([remarkP, wait(7500).then(() => null)]);
+  const noteEl = y <= 912 ? appendLine(live, { t: '', text: (rk && rk.line) || localNightLine(res.outcome), kind: 'note', id: 'remark-line' }, y) : null;
+  aiStat.lines += 1;
+  if (rk && rk.line && rk.by === 'llm') aiStat.linesLLM += 1;
+  if (noteEl && (!rk || rk.by !== 'llm')) {
+    remarkP.then(function (late) {
+      if (!late || !late.line || late.by !== 'llm') return;
+      const t2 = noteEl.querySelectorAll('text');
+      if (t2.length > 1) t2[1].textContent = Array.from(late.line).slice(0, 42).join('');
+      aiStat.linesLLM += 1;
+    }).catch(function () {});
+  }
+  await wait(1100);
+  busy = false;
+  if (g.escaped || g.nights.length >= g.maxDays) await showSettle();
+  else { dayBriefing(); await paint(); if (g.day === 6) askSick(); }
+}
+
+function appendLine(live, ev, y) {
+  if (!live) return null;
+  const NS = 'http://www.w3.org/2000/svg';
+  const color = { block:'#882e1f', leak:'#882e1f', catch:'#544a3c', escape:'#882e1f', event:'#80603c', note:'#7e6f5c' }[ev.kind] || '#40372d';
+  const font = ev.kind === 'event' || ev.kind === 'note' ? 'KaiTi' : 'SimSun';
+  const chars = Array.from(ev.text);
+  const rows = [];
+  for (let i = 0; i < chars.length; i += 42) rows.push(chars.slice(i, i + 42).join(''));
+  const box = document.createElementNS(NS, 'g');
+  const t0 = document.createElementNS(NS, 'text');
+  t0.setAttribute('x', '252'); t0.setAttribute('y', String(y));
+  t0.setAttribute('font-size', '12'); t0.setAttribute('fill', '#7e6f5c');
+  t0.setAttribute('letter-spacing', '0.5'); t0.textContent = ev.t || '';
+  box.appendChild(t0);
+  rows.slice(0, 2).forEach((row, i) => {
+    const t = document.createElementNS(NS, 'text');
+    t.setAttribute('x', '306'); t.setAttribute('y', String(y + i * 21));
+    t.setAttribute('font-size', String(ev.kind === 'event' ? 14 : 15.5));
+    t.setAttribute('font-family', font);
+    t.setAttribute('fill', i ? '#7e6f5c' : color);
+    t.textContent = row;
+    box.appendChild(t);
+  });
+  if (ev.id) box.setAttribute('id', ev.id);
+  live.appendChild(box);
+  return ev.id ? box : null;
+}
+
+// AI 慢的时候先落这一句，保证「夜里总有人说话」
+function localNightLine(outcome) {
+  if (outcome === 'escape') return '门开着，风是从外面进来的。';
+  if (outcome === 'caught') return '他被按住的时候没有挣扎，只是看着灯。';
+  if (outcome === 'slip') return '灯挪开了。他站在原地没动。';
+  if (outcome === 'blocked') return '他在门口站了一会儿，把手插回兜里。';
+  return '他把床板翻过来，又翻了回去。';
+}
+
+// ---------- 第 6 天：他病了 ----------
+function askSick() {
+  const sheet = openSheet(
+    '<h3>他 病 了</h3>' +
+    '<p class="sub">他在医务室躺了一整天</p>' +
+    '<div class="chips" style="grid-template-columns:1fr">' +
+    '<div class="chip" data-k="sick" data-id="treat"><div><div class="nm">叫医生来</div><div class="in">信任 +12 · 服从度 +6</div></div></div>' +
+    '<div class="chip" data-k="sick" data-id="ignore"><div><div class="nm">扣下他今天的行动</div><div class="in">他今天动不了 · 服从度 −4 · 他会记住这一笔</div></div></div>' +
+    '</div>'
+  );
+  sheet.addEventListener('click', (ev) => {
+    const el = ev.target.closest ? ev.target.closest('.chip') : null;
+    if (!el) return;
+    E.sickChoice(g, el.dataset.id);
+    closeSheet();
+    syncView();
+    view.report = [{ t:'处置', text: el.dataset.id === 'treat' ? '你叫了医生。' : '你把他关在里面，什么也没给他。' }];
+    paint();
+  });
+}
+
+// ---------- 结算 ----------
+async function showSettle() {
+  const s = E.settle(g);
+  syncView();
+  view.phase = 'settle'; view.path = null;
+  view.settle = { title: s.title, sub: s.sub, quote: s.quote };
+  view.settleStats = {
+    days: '坚 持 了 ' + Math.min(g.nights.length, 7) + ' 天',
+    obedience: Math.round(g.obedience), hostility: Math.round(g.hostility),
+    ai: 'AI ‖ 挑路 ' + aiStat.picksLLM + '/' + aiStat.picks + ' 夜 · 开口 ' + aiStat.linesLLM + '/' + aiStat.lines + ' 次',
+  };
+  view.report = [];
+  await paint();
+}
+
+// ---------- 点击 ----------
+document.addEventListener('click', (ev) => {
+  const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+  if (!el) return;
+  const act = el.dataset.act;
+  if (act === 'again') { newGame(); return; }
+  if (act === 'write') askWrite();
+  if (act === 'night') askNight();
+});
+document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeSheet(); });
+
+newGame();
+warm();   // 预热语言模型，别让第一条规矩撞上冷启动
+window.__game = { get g() { return g; }, get view() { return view; }, newGame, E, showSettle, askNight, askWrite };
+M["app"] = {};
+})();
+
+})();
+</script>
+</body>
+</html>

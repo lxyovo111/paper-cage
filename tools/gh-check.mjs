@@ -1,0 +1,10 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'https://github.com' });
+await new Promise(r=>setTimeout(r,5000));
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+await b.send('Runtime.enable', {}, a.sessionId);
+const info = await b.ev("(()=>{const txt=document.body.innerText.slice(0,600);return {href:location.href,logged:!txt.includes('Sign in'),head:txt.replace(/\\n+/g,' | ').slice(0,300)};})()", a.sessionId);
+console.log('GH', JSON.stringify(info));
+await b.send('Target.closeTarget', { targetId: t.targetId });
+b.close();

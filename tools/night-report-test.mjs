@@ -1,0 +1,31 @@
+import { launch, sleep } from './cdp.mjs';
+const p = await launch();
+await p.init();
+const errs = [];
+p.on(m => { if (m.method === 'Runtime.exceptionThrown') errs.push(String(m.params.exceptionDetails.exception?.description || m.params.exceptionDetails.text).slice(0,300)); });
+const ev = async (s) => await p.ev(s);
+const click = async (sel) => await p.ev('(()=>{const el=document.querySelector(' + JSON.stringify(sel) + '); if(!el) return false; el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window})); return true;})()');
+await p.goto('http://127.0.0.1:7861/dist/index.html?seed=9&llm=0&speed=0.3');
+await sleep(800);
+await click('[data-act=write]');
+await sleep(400);
+await ev('(()=>{const t=document.querySelector("#rtxt"); t.value="医务室的窗，任何时候都不许碰"; t.dispatchEvent(new Event("input",{bubbles:true}));})()');
+await click('[data-k=compile]');
+await sleep(500);
+await click('[data-k=ok]');
+await sleep(700);
+await click('[data-act=night]');
+await sleep(600);
+await click('[data-k=skip]');
+let best = null;
+for (let i = 0; i < 60; i++) {
+  await sleep(400);
+  const info = await ev('JSON.stringify({phase:window.__game.view.phase, n:document.querySelectorAll("#report-live text").length, texts:[...document.querySelectorAll("#report-live text")].map(t=>t.textContent)})');
+  const j = JSON.parse(info);
+  if (j.n > 0) best = j;
+  if (j.phase !== 'night' && j.n >= 0) break;
+}
+console.log('REPORT', JSON.stringify(best));
+console.log('errs', errs.join(' | ') || 'none');
+await p.shot('tools/night-report-test.png');
+await p.close();

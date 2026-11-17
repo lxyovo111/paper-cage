@@ -1,0 +1,23 @@
+import { launch, sleep } from './cdp.mjs';
+import { startRec, writeConcat } from './screencast.mjs';
+import { execFileSync } from 'node:child_process';
+const FF = 'C:\\Users\\lcj\\AppData\\Local\\Microsoft\\WinGet\\Packages\\Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe\\ffmpeg-9.0.2-full_build\\bin\\ffmpeg.exe';
+const p = await launch({ w: 1600, h: 1000, scale: 1 });
+await p.init();
+await p.goto('http://127.0.0.1:7861/dist/index.html?seed=7&speed=0.5');
+await sleep(1200);
+const rec = await startRec(p, 'tools/frames-test');
+await sleep(1500);
+await p.ev("(()=>{const el=document.querySelector('[data-act=write]'); if(el) el.dispatchEvent(new MouseEvent('click',{bubbles:true})); return !!el;})()");
+await sleep(1500);
+const n = await p.ev("document.querySelectorAll('#rtxt').length");
+if (n) { await p.ev("(()=>{const t=document.querySelector('#rtxt'); const s='洗衣房里的床单不许带走'; let i=0; return new Promise(res=>{const id=setInterval(()=>{t.value=s.slice(0,++i); t.dispatchEvent(new Event('input',{bubbles:true})); if(i>=s.length){clearInterval(id);res(true);}},90);});})()"); }
+await sleep(1200);
+await p.ev("(()=>{const b=document.querySelector('[data-k=compile]'); if(b) b.click(); return !!b;})()");
+await sleep(2500);
+const frames = await rec.stop();
+console.log('frames', frames.length, 'span', frames.length ? ((frames[frames.length-1].t-frames[0].t)/1000).toFixed(1)+'s' : 0);
+writeConcat(frames, 'tools/concat-test.txt');
+execFileSync(FF, ['-y','-f','concat','-safe','0','-i','tools/concat-test.txt','-vsync','vfr','-pix_fmt','yuv420p','-r','30','tools/test.mp4'], { stdio: 'inherit' });
+console.log('mp4 done');
+await p.close();

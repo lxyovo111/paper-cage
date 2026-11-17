@@ -1,0 +1,13 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+await b.send('Page.enable', {}, a.sessionId);
+await b.send('Runtime.enable', {}, a.sessionId);
+await b.send('Page.navigate', { url: 'https://github.com' }, a.sessionId);
+await new Promise(r=>setTimeout(r,6000));
+const info = await b.ev("(()=>{const m=document.querySelector('meta[name=user-login]');const links=[...document.querySelectorAll('a')].map(x=>x.getAttribute('href')).filter(h=>h&&h.startsWith('/')&&h.split('/').length===2);return {user:m?m.content:null,some:links.slice(0,12),avatars:[...document.querySelectorAll('img')].map(i=>i.alt).filter(Boolean).slice(0,5)};})()", a.sessionId);
+console.log('GH', JSON.stringify(info));
+await b.shot('tools/gh-home.png');
+await b.send('Target.closeTarget', { targetId: t.targetId });
+b.close();

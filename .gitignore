@@ -1,0 +1,43 @@
+﻿# ---- 本地运行产物 / 缓存 ----
+__pycache__/
+*.pyc
+.upload/
+.studio-repo/
+.b2/
+.browser/
+.cr/
+.edgeprof*/
+.edge-*/
+node_modules/
+
+# ---- 系统 ----
+Thumbs.db
+.DS_Store
+
+# ---- 根目录杂物 ----
+crop_*.png
+concept.html
+*.zip
+console.log*
+
+# ---- tools/ 只保留可复现的脚本（录屏帧、视频、临时探针一律不入库）----
+tools/**
+!tools/*.mjs
+!tools/*.py
+!tools/package.json
+!tools/pnpm-lock.yaml
+tools/_*.mjs
+tools/_*.py
+tools/dbg-*.mjs
+tools/probe-*.mjs
+tools/contest-*.mjs
+tools/article-*.mjs
+tools/sub-*.mjs
+tools/llm-*.mjs
+tools/live-*.mjs
+tools/model-*.mjs
+tools/check-*.mjs
+tools/debug-*.mjs
+tools/tmp/
+tools/gradio-x/
+
