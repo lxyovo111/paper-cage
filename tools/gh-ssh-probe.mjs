@@ -1,0 +1,11 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+await b.send('Page.enable', {}, a.sessionId);
+await b.send('Runtime.enable', {}, a.sessionId);
+await b.send('Page.navigate', { url: 'https://github.com/settings/ssh/new' }, a.sessionId);
+await new Promise(r=>setTimeout(r,7000));
+const info = await b.ev("(()=>{const q=s=>document.querySelector(s);const inputs=[...document.querySelectorAll('input,textarea')].map(e=>({tag:e.tagName,type:e.type,name:e.name,id:e.id,ph:e.placeholder}));return {href:location.href,title:document.title,inputs,buttons:[...document.querySelectorAll('button')].map(x=>x.innerText.trim()).slice(0,10),body:document.body.innerText.slice(0,300)};})()", a.sessionId);
+console.log(JSON.stringify(info,null,1));
+b.close();

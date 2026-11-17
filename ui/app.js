@@ -1,5 +1,6 @@
 // app.js — 游戏主控。渲染归 screen.js，判定归 engine.js，语言归 npc.js。
 import { renderScreen } from './screen.js';
+import { renderMobile, renderMobileSettle, isMobileView } from './mobile.js';
 import * as E from '../game/engine.js';
 import { compileSmart, chooseHole, remark, warm, llmOn } from './npc.js';
 
@@ -53,7 +54,17 @@ function syncView() {
   view.obedience = Math.round(g.obedience); view.hostility = Math.round(g.hostility);
   view.rules = g.rules.map((r) => ({ text: r.text, note: r.note }));
 }
-async function paint() { stage.innerHTML = await renderScreen(view); }
+async function paint() {
+  // 手机竖屏走 mobile.js 的纵向版式；桌面仍是 screen.js 的 1600×1000 一屏。规则与判定完全一致。
+  if (isMobileView()) {
+    const settle = view.phase === 'settle';
+    stage.style.aspectRatio = settle ? '800 / 1500' : '800 / 1840';
+    stage.innerHTML = settle ? renderMobileSettle(view) : renderMobile(view);
+    return;
+  }
+  stage.style.aspectRatio = '';
+  stage.innerHTML = await renderScreen(view);
+}
 async function centers() {
   try {
     const mapMod = await import('./map.js');
@@ -305,21 +316,29 @@ async function runNight() {
 function appendLine(live, ev, y) {
   if (!live) return null;
   const NS = 'http://www.w3.org/2000/svg';
+  // 版式换算：桌面版直接用屏幕坐标；手机版由 #report-live 的 data-cfg 折算（同一套打字逻辑）
+  let cfg = null;
+  try { const raw = live.getAttribute && live.getAttribute('data-cfg'); if (raw) cfg = JSON.parse(raw); } catch (err) {}
+  const k = cfg ? cfg.k : 1;
+  const Y = cfg ? cfg.y0 + (y - 792) * k : y;
+  const X1 = cfg ? cfg.x1 : 252, X2 = cfg ? cfg.x2 : 306;
+  const FS = cfg ? cfg.fs : null;
+  const COLS = cfg ? cfg.cols : 42;
   const color = { block:'#882e1f', leak:'#882e1f', catch:'#544a3c', escape:'#882e1f', event:'#80603c', note:'#7e6f5c' }[ev.kind] || '#40372d';
   const font = ev.kind === 'event' || ev.kind === 'note' ? 'KaiTi' : 'SimSun';
   const chars = Array.from(ev.text);
   const rows = [];
-  for (let i = 0; i < chars.length; i += 42) rows.push(chars.slice(i, i + 42).join(''));
+  for (let i = 0; i < chars.length; i += COLS) rows.push(chars.slice(i, i + COLS).join(''));
   const box = document.createElementNS(NS, 'g');
   const t0 = document.createElementNS(NS, 'text');
-  t0.setAttribute('x', '252'); t0.setAttribute('y', String(y));
-  t0.setAttribute('font-size', '12'); t0.setAttribute('fill', '#7e6f5c');
+  t0.setAttribute('x', String(X1)); t0.setAttribute('y', String(Y));
+  t0.setAttribute('font-size', String(FS ? Math.round(FS * 0.72) : 12)); t0.setAttribute('fill', '#7e6f5c');
   t0.setAttribute('letter-spacing', '0.5'); t0.textContent = ev.t || '';
   box.appendChild(t0);
   rows.slice(0, 2).forEach((row, i) => {
     const t = document.createElementNS(NS, 'text');
-    t.setAttribute('x', '306'); t.setAttribute('y', String(y + i * 21));
-    t.setAttribute('font-size', String(ev.kind === 'event' ? 14 : 15.5));
+    t.setAttribute('x', String(X2)); t.setAttribute('y', String(Y + (cfg ? i * FS * 1.3 : i * 21)));
+    t.setAttribute('font-size', String(FS || (ev.kind === 'event' ? 14 : 15.5)));
     t.setAttribute('font-family', font);
     t.setAttribute('fill', i ? '#7e6f5c' : color);
     t.textContent = row;
@@ -385,6 +404,12 @@ document.addEventListener('click', (ev) => {
   if (act === 'night') askNight();
 });
 document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeSheet(); });
+// 手机 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
+let __wasMobile = isMobileView();
+window.addEventListener('resize', () => {
+  const now = isMobileView();
+  if (now !== __wasMobile) { __wasMobile = now; paint(); }
+});
 
 newGame();
 warm();   // 预热语言模型，别让第一条规矩撞上冷启动

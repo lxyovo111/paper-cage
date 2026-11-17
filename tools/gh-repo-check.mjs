@@ -1,0 +1,13 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+const sid = a.sessionId;
+await b.send('Page.enable', {}, sid);
+await b.send('Runtime.enable', {}, sid);
+await b.send('Page.navigate', { url: 'https://github.com/lxyovo111/seventh-night' }, sid);
+await new Promise(r=>setTimeout(r,7000));
+await b.shot('tools/gh-repo.png');
+const info = await b.ev("(()=>({title:document.title,files:[...document.querySelectorAll('[role=row] .react-directory-truncate a, [role=row] a.Link--primary')].map(x=>x.innerText.trim()).slice(0,20),readme:(document.querySelector('article')||{}).innerText? document.querySelector('article').innerText.slice(0,200):'',about:document.body.innerText.slice(0,200)}))()", sid);
+console.log('INFO', JSON.stringify(info));
+b.close();

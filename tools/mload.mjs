@@ -1,0 +1,12 @@
+import { launch } from './cdp.mjs';
+const p = await launch({ port: 9311, dir: 'C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-mtest', w: 1600, h: 1000, scale: 1 });
+const errs = [];
+p.on(m => { if (m.method === 'Runtime.exceptionThrown') { errs.push('EXC ' + JSON.stringify(m.params.exceptionDetails.exception && m.params.exceptionDetails.exception.description || m.params.exceptionDetails.text)); } if (m.method === 'Runtime.consoleAPICalled') { errs.push('LOG ' + m.params.type + ' ' + (m.params.args||[]).map(a=>a.value||a.description).join(' ')); } });
+await p.init();
+await p.send('Page.navigate', { url: 'http://127.0.0.1:7861/dist/index.html?seed=21&llm=0' });
+await new Promise(r => setTimeout(r, 4000));
+const st = await p.send('Runtime.evaluate', { expression: 'typeof window.__game', returnByValue: true });
+console.log('game', JSON.stringify(st.result));
+console.log('ERRS', errs.slice(0,6).join('\n'));
+await p.shot('tools/mtest-load.png');
+p.ws.close(); p.proc.kill();

@@ -1,0 +1,12 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+const sid = a.sessionId;
+await b.send('Page.enable', {}, sid);
+await b.send('Runtime.enable', {}, sid);
+await b.send('Page.navigate', { url: 'https://modelscope.cn/learn/editor/438502' }, sid);
+await new Promise(r=>setTimeout(r,7000));
+const dump = await b.ev("(()=>{const out=[];document.querySelectorAll('button').forEach((e,i)=>{const r=e.getBoundingClientRect();out.push({i,txt:JSON.stringify(e.innerText),tag:e.tagName,cls:e.className,x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width),dis:e.disabled});});return out.filter(o=>o.txt.includes('发')||o.txt.includes('上')||o.txt.includes('步'));})()", sid);
+console.log('DUMP', JSON.stringify(dump));
+b.close();

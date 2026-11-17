@@ -1,0 +1,17 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+const sid = a.sessionId;
+await b.send('Page.enable', {}, sid);
+await b.send('Runtime.enable', {}, sid);
+await b.send('Page.navigate', { url: 'https://github.com/lxyovo111/seventh-night' }, sid);
+await new Promise(r=>setTimeout(r,7000));
+const imgs = await b.ev("(()=>[...document.querySelectorAll('article img')].map(i=>({src:(i.getAttribute('src')||'').slice(0,60),w:i.naturalWidth,h:i.naturalHeight})))", sid);
+console.log('IMGS', JSON.stringify(imgs));
+const btn = await b.ev("(()=>{const cand=[...document.querySelectorAll('button')].filter(e=>(e.getAttribute('aria-label')||'').toLowerCase().includes('metadata'));if(cand[0]){cand[0].click();return {ok:true,label:cand[0].getAttribute('aria-label')};}const gut=[...document.querySelectorAll('summary')].find(e=>/about|edit/i.test(e.innerText||''));if(gut){gut.click();return {ok:true,label:'summary'};}return {ok:false,buttons:[...document.querySelectorAll('button')].map(e=>e.getAttribute('aria-label')).filter(Boolean).slice(0,20)};})()", sid);
+console.log('EDIT', JSON.stringify(btn));
+await new Promise(r=>setTimeout(r,2500));
+const dlg = await b.ev("(()=>({inputs:[...document.querySelectorAll('input,textarea')].map(e=>({id:e.id,n:e.name,ph:e.placeholder,v:(e.value||'').slice(0,60)})).filter(x=>x.id||x.n),buttons:[...document.querySelectorAll('button')].map(e=>e.innerText.trim()).filter(Boolean).slice(0,15),text:document.body.innerText.slice(-400)}))()", sid);
+console.log('DIALOG', JSON.stringify(dlg));
+b.close();

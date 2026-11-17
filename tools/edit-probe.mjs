@@ -1,0 +1,13 @@
+import { connect } from './browser.mjs';
+const b = await connect();
+const t = await b.send('Target.createTarget', { url: 'about:blank' });
+const a = await b.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
+const sid = a.sessionId;
+await b.send('Page.enable', {}, sid);
+await b.send('Runtime.enable', {}, sid);
+await b.send('Page.navigate', { url: 'https://modelscope.cn/learn/edit/438502' }, sid);
+await new Promise(r=>setTimeout(r,8000));
+const info = await b.ev("(()=>{const ed=document.querySelector('.modelscope_ding_editor_pcEditor_content [data-cangjie-editable]');return {href:location.href,hasEditor:!!ed,buttons:[...document.querySelectorAll('button')].map(e=>e.innerText.trim()).filter(Boolean).slice(-12),title:(document.querySelector('input.antd5-input[placeholder*=文章标题]')||{}).value||'',tail: ed? ed.innerText.slice(-300):''};})()", sid);
+console.log('INFO', JSON.stringify(info));
+await b.shot('tools/edit-article.png');
+b.close();

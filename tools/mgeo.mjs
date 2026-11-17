@@ -1,0 +1,10 @@
+import { launch } from './cdp.mjs';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p = await launch({ port: 9317, dir: 'C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-mtest', w: 390, h: 844, scale: 2 });
+await p.send('Page.enable'); await p.send('Runtime.enable');
+await p.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true });
+const ev = async (e) => (await p.send('Runtime.evaluate', { expression: e, returnByValue: true })).result.value;
+await p.send('Page.navigate', { url: 'http://127.0.0.1:7861/dist/index.html?seed=21&llm=0&speed=0.5' });
+await sleep(3000);
+console.log(JSON.stringify(await ev("(()=>{const s=document.getElementById('stage'),v=s.querySelector('svg'),r=s.getBoundingClientRect(),q=v.getBoundingClientRect();return {stage:[r.x,r.y,r.width,r.height], svg:[q.x,q.y,q.width,q.height], vb:v.getAttribute('viewBox'), docH:document.documentElement.scrollHeight, bodyH:document.body.scrollHeight, inner:[innerWidth,innerHeight], ar:getComputedStyle(s).aspectRatio, css:getComputedStyle(s).height};})()")));
+p.ws.close(); p.proc.kill();
