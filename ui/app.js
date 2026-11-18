@@ -137,6 +137,7 @@ function dayBriefing() {
     else lines.push({ t:'昨夜', text: out });
   }
   if (d === 1) lines = [
+    { t:'档案', text:g.habit ? g.habit.line : '' },
     { t:'', text:'七天。你有六条规矩，和一个每天夜里都在找缝的人。' },
     { t:'', text:'写一条规矩，然后按右下角的「入夜」。' },
   ];
@@ -253,21 +254,38 @@ function costHint(r) {
 async function askNight() {
   if (busy) return;
   if (g.day === 5 && !wroteToday) return toast('今晚上级检查：你必须再写一条规矩。');
+  const holes = E.enumerateHoles(g);
   const sheet = openSheet(
     '<h3>今 夜 他 会 试 哪 条 路</h3>' +
-    '<p class="sub">猜中：明天多 1 点行动力，狱警也会多站一班</p>' +
-    '<div class="chips">' + E.ROUTES.map((r) => {
-      const hole = E.enumerateHoles(g).find((h) => h.id === r.id) || {};
+    '<p class="sub">没查过的路只能赌。猜中：明天多 1 点行动力，狱警也会多站一班</p>' +
+    '<p class="hint">档案：' + esc(g.habit ? g.habit.line : '') + '</p>' +
+    '<div class="chips">' + E.availableRoutes(g).map((r) => {
+      const hole = holes.find((h) => h.id === r.id) || {};
+      const detail = hole.known
+        ? (hole.open ? '这条路是通的' : '卡在：' + (hole.blockedAt || '') + (hole.strength < 0.6 ? '（拦得不稳）' : ''))
+        : '没查过这条路';
       return '<div class="chip" data-k="pred" data-id="' + r.id + '"><div><div class="nm">' + r.name +
-        '</div><div class="in">' + (hole.open ? '这条路是通的' : '卡在：' + (hole.blockedAt || '')) + '</div></div></div>';
+        '</div><div class="in" style="' + (hole.known ? '' : 'opacity:.5') + '">' + detail + '</div></div></div>';
     }).join('') + '</div>' +
+    '<div class="row stack"><button class="btn ghost" data-k="interrogate">提审他 · 1 行动力</button>' +
+    '<button class="btn ghost" data-k="patrol">加派夜巡 · 2 行动力</button></div>' +
     '<div class="row"><button class="btn ghost" data-k="skip">不猜，直接入夜</button></div>'
   );
-  sheet.addEventListener('click', (ev) => {
+  sheet.addEventListener('click', async (ev) => {
     const el = ev.target.closest ? ev.target.closest('.chip') : null;
     const k = ev.target.dataset && ev.target.dataset.k;
-    if (el) { closeSheet(); E.predict(g, el.dataset.id); runNight(); }
-    else if (k === 'skip') { closeSheet(); runNight(); }
+    if (el) { closeSheet(); E.predict(g, el.dataset.id); runNight(); return; }
+    if (k === 'skip') { closeSheet(); runNight(); return; }
+    if (k === 'interrogate' || k === 'patrol') {
+      const r = k === 'interrogate' ? E.interrogate(g) : E.extraPatrol(g);
+      if (!r.ok) return toast(r.error);
+      closeSheet();
+      syncView();
+      await paint();
+      const nm = r.route ? '「' + r.route.name + '」' : '一条你已经知道的路';
+      toast(k === 'interrogate' ? '他交代了：' + nm : '夜巡回报：他最近在看' + nm);
+      askNight();
+    }
   });
 }
 

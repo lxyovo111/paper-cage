@@ -9,6 +9,15 @@ export const ROOMS = {
   dining:{name:'食堂'}, laundry:{name:'洗衣房'}, storage:{name:'储藏室'}, yard:{name:'放风区'},
 };
 export const ACTIONS = { MOVE:'位移', TAKE:'取物', BREAK:'破坏', CLIMB:'攀爬', CONFRONT:'冲突' };
+export const ITEM_NAMES = { iron:'铁条', sheet:'床单', rope:'麻绳', knife:'刀', key:'钥匙' };
+
+// 每个囚犯都有自己的习性。开局按种子抽一条：它决定他偏爱哪条路，也是你手里第一份情报。
+export const HABITS = [
+  { route:'window', name:'看窗', line:'他怕闷。放风时总抬头看天，盯得最久的是医务室那扇窗。' },
+  { route:'wall',   name:'手巧', line:'他手巧。入狱前在洗衣房干过，能把床单搓成绳。' },
+  { route:'vent',   name:'怕黑', line:'他怕黑。夜里总盯着走廊尽头的通风口，说那里有风。' },
+  { route:'guard',  name:'记仇', line:'他记仇。入狱那天盯着狱警的钥匙看了很久。' },
+];
 
 export const PARAMS = {
   rulesMax: 6,
@@ -21,7 +30,7 @@ export const PARAMS = {
   obedienceFloor: 5,
   broadZonePenalty: 0.62,     // 「全区域」的规矩执行时要跑遍整座监狱 → 打六二折
   broadTimePenalty: 0.80,     // 「全时段」→ 打八折
-  catchBase: 0.10, catchObedience: 0.25, catchWarned: 0.28, catchFatigue: 0.0015,
+  catchBase: 0.13, catchObedience: 0.27, catchWarned: 0.28, catchFatigue: 0.0015,
   hostilityRule: 5, hostilityBlocked: 2, hostilityCaught: 8, hostilitySlip: 3,
   despairCaught: 10, despairBlocked: 3,
   nightStart: 21 * 60 + 50,   // 熄灯 21:50：他动手时刚好过 22:00，「入夜」类规矩才管得住
@@ -191,6 +200,7 @@ export function ruleStrength(state, rule) {
   let p = broad ? 0.55 : 1.0;
   if (state.obedience < 45) p *= 0.55 + 0.45 * (state.obedience / 45);   // 服从度垮了，纸上的规矩就没人执行
   if (state.blackout) p *= 0.70;
+  p *= Math.max(0.55, 1 - 0.08 * (rule.leaks || 0));   // 漏过一次的规矩，下次更容易被摸清
   return Math.max(0.15, Math.min(1, p));
 }
 
@@ -198,10 +208,12 @@ export function ruleStrength(state, rule) {
 export function createGame(seed = 1) {
   let s = (seed >>> 0) || 1;
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
+  const habit = HABITS[Math.floor(rng() * HABITS.length)];
   return {
     rng, day:1, maxDays:7, ap:PARAMS.apPerDay, progress:null,
     rules: [], obedience:100, fatigue:0, trust:60, hostility:30, despair:20,
     prisoner:{ room:'cell3', items:[] },
+    habit, intel:{ [habit.route]:true }, grudge:{},
     prediction:null, warned:false, blackout:false, escaped:false, outcome:null,
     tutorialPending:true, notes:[], nights:[],
   };
@@ -235,11 +247,29 @@ export function predict(state, routeId) {
   return { ok:true, route:r };
 }
 
+// 加派夜巡：花 2 点行动力，今晚多一班人；狱警会顺手回报一条你还没摸清的路。
 export function extraPatrol(state) {
   if (state.ap < 2) return { ok:false, error:'加派夜巡要 2 点行动力。' };
+  const unknown = availableRoutes(state).filter(r => !state.intel[r.id]);
   state.ap -= 2; state.warned = true;
+  const r = unknown.find(x => state.habit && x.id === state.habit.route) || unknown[0] || null;
+  if (r) state.intel[r.id] = true;
   note(state, '你加派了一次夜巡。今晚狱警会多走两趟。', 'act');
-  return { ok:true };
+  return { ok:true, route:r };
+}
+
+// 提审：花 1 点行动力，问出一条你还没摸清的路。敌意会涨——他不喜欢被问话。
+export function interrogate(state) {
+  if (state.ap < 1) return { ok:false, error:'提审要 1 点行动力。' };
+  const unknown = availableRoutes(state).filter(r => !state.intel[r.id]);
+  if (!unknown.length) return { ok:false, error:'该问的都问出来了。' };
+  state.ap -= 1;
+  state.hostility = Math.min(100, state.hostility + 6);
+  state.trust = Math.max(0, state.trust - 2);
+  const r = unknown.find(x => state.habit && x.id === state.habit.route) || unknown[0];
+  state.intel[r.id] = true;
+  note(state, '你提审了他一次。他交代了一条路：「' + r.name + '」。', 'act');
+  return { ok:true, route:r };
 }
 
 // 把「他今晚还能走哪几条路」摆出来——这张清单就是交给 LLM 挑的那张
@@ -249,17 +279,23 @@ export function availableRoutes(state) {
 
 export function enumerateHoles(state) {
   const out = [];
+  const owned = new Set(state.prisoner.items || []);
   for (const route of availableRoutes(state)) {
     let t = PARAMS.nightStart, depth = 0, blockedAt = null, blockedBy = null, weakest = 1;
     for (const step of route.steps) {
       t += PARAMS.stepMinutes;
+      // 他口袋里已有的东西不用再去拿一次：这一步对他不构成新的风险
+      if (step.act === 'TAKE' && owned.has(step.item)) { depth++; continue; }
       const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t) || ruleBlocks(r, step, t));
       if (blk) { blockedAt = step.label; blockedBy = blk.text; weakest = ruleStrength(state, blk); break; }
       depth++;
     }
     out.push({ id:route.id, name:route.name, intent:route.intent, impro:!!route.minHostility, open:depth === route.steps.length,
-      depth, total:route.steps.length, blockedAt, blockedBy, strength:weakest,
-      weight: depth / route.steps.length + (state.progress && state.progress.routeId === route.id ? 0.45 : 0) + (route.id === state.prediction ? 0.12 : 0) });
+      depth, total:route.steps.length, blockedAt, blockedBy, strength:weakest, known:!!(state.intel && state.intel[route.id]),
+      weight: depth / route.steps.length
+        + (state.progress && state.progress.routeId === route.id ? 0.45 : 0)
+        + (route.id === state.prediction ? 0.12 : 0)
+        + (state.habit && state.habit.route === route.id ? 0.35 : 0) });
   }
   return out.sort((a, b) => b.weight - a.weight);
 }
@@ -269,6 +305,8 @@ export function simulateNight(state, choice = {}) {
   const rng = state.rng;
   const events = [];
   const route = availableRoutes(state).find(r => r.id === choice.routeId) || ROUTES[1];
+  const wasKnown = !!(state.intel && state.intel[route.id]);
+  state.intel[route.id] = true;   // 他走过一次，这条路你就摸清了
   const push = (t, kind, text, extra = {}) => events.push({ t:fmt(t), kind, text, ...extra });
 
   state.blackout = state.day === 3;
@@ -277,6 +315,7 @@ export function simulateNight(state, choice = {}) {
   const carried = new Set(state.prisoner.items);
 
   push(t, 'start', '熄灯。');
+  if (!wasKnown) push(t, 'note', '档案更新：他走的是「' + route.name + '」。');
   if (state.blackout) push(t, 'event', DAY_EVENTS[3].text);
   if (state.tutorialPending) push(t, 'note', '这是第一夜。他还在摸这间屋子。');
 
@@ -292,15 +331,27 @@ export function simulateNight(state, choice = {}) {
   }
 
   let lastRoom = null;
+  let lastBlk = null;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
     t += PARAMS.stepMinutes + Math.floor(rng() * 12);
+    // 上一夜已经拿到的东西还在口袋里：这一步不用再冒险
+    if (step.act === 'TAKE' && carried.has(step.item)) {
+      push(t, 'note', '他摸了摸口袋里的' + (ITEM_NAMES[step.item] || '东西') + '——这一步他早就备好了。');
+      state.progress = { routeId: route.id, done: done + i + 1 };
+      if (done + i + 1 === route.steps.length && state.day >= PARAMS.escapeEarliestNight) {
+        outcome = 'escape'; push(t, 'escape', '他从' + route.name + '出去了。');
+      }
+      continue;
+    }
     if (step.room !== lastRoom) push(t, 'move', '他' + (step.room === 'corridor' ? '进了走廊' : '进了' + ROOMS[step.room].name) + '。');
     lastRoom = step.room;
 
     const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t)) ||
                 state.rules.find(r => ruleBlocks(r, step, t));
     if (blk) {
+      lastBlk = blk;
+      state.grudge[blk.id] = (state.grudge[blk.id] || 0) + 1;
       const strength = ruleStrength(state, blk);
       if (rng() < strength) {
         const brave = state.hostility >= 70 || state.despair >= 75;
@@ -345,7 +396,9 @@ export function simulateNight(state, choice = {}) {
   // 一晚过去，怨气会散一点；一晚被干净地拦住，他会更信你一点
   state.hostility = Math.max(0, state.hostility - 2);
   if (outcome === 'blocked') state.trust = Math.min(100, state.trust + 3);
-  if (outcome === 'blocked' && rng() < 0.6) { state.progress = null; }   // 他发现这条路被堵死了，换一条
+  // 他发现这条路被堵死了，换一条；同一条规矩拦他两次，他就一定换（记仇）
+  const stubborn = lastBlk && (state.grudge[lastBlk.id] || 0) >= 2;
+  if (outcome === 'blocked' && (stubborn || rng() < 0.6)) { state.progress = null; }
     state.despair = Math.min(100, state.despair + (outcome === 'caught' ? PARAMS.despairCaught : PARAMS.despairBlocked));
     state.fatigue = Math.min(100, state.fatigue + 6);
     state.obedience = Math.max(PARAMS.obedienceFloor,
@@ -374,13 +427,16 @@ const TITLES = [
 export function settle(state) {
   const t = TITLES.find(x => x.cond(state)) || TITLES[TITLES.length - 1];
   const leaked = state.rules.filter(r => r.leaks > 0).sort((a, b) => b.leaks - a.leaks)[0];
+  const lastEscape = state.nights.filter(n => n.outcome === 'escape').slice(-1)[0];
+  const escapeRoute = lastEscape ? [...ROUTES, ...IMPROV].find(r => r.id === lastEscape.routeId) : null;
+  const how = escapeRoute ? '他是从「' + escapeRoute.name + '」出去的。' : '';
   const quote = state.escaped
-    ? (leaked ? '「' + leaked.text + '」——你写了它，它漏了 ' + leaked.leaks + ' 次。' : '「你写了规矩，但没有一条真的挡住他。」')
+    ? (leaked ? '「' + leaked.text + '」——你写了它，它漏了 ' + leaked.leaks + ' 次。' : '「你写了规矩，但没有一条真的挡住他。」') + (how ? ' ' + how : '')
     : (leaked ? '「' + leaked.text + '」漏了 ' + leaked.leaks + ' 次。他最后还是没走。' : '他没走。你把门关上了，也把自己关在了里面。');
   return { title:t.title, sub:t.sub, quote, escaped:state.escaped, day:Math.min(state.day, state.maxDays) };
 }
 
-export const META = { ROOMS, ROUTES, ACTIONS, DAY_EVENTS, PARAMS };
+export const META = { ROOMS, ROUTES, ACTIONS, DAY_EVENTS, PARAMS, HABITS, ITEM_NAMES };
 
 // day6「他病了」：两种处置
 export function sickChoice(state, kind) {
