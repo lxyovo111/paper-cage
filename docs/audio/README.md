@@ -25,5 +25,9 @@
 ## 接线
 
 - 逻辑在 `ui/audio.js`：两条 BGM 交叉淡入（900ms），音效按事件播放，首次用户操作后才启动。
-- 静音开关是页面左上角的小圆钮（`#mute-btn`），状态存 `localStorage['cage-muted']`。
+- 静音开关是画面左上角的小圆钮（`#mute-btn`，桌面在页眉左侧空白、手机在地图左上角），状态存 `localStorage['cage-muted']`。
 - 本地 `server.mjs` 把 `/static/*` 映射到项目根，和创空间的 FastAPI `StaticFiles` 行为一致。
+
+## 试听
+
+- `game-audio.mp3`：按游戏内顺序拼接的 20 秒总览（白天底噪 8s → 夜间底噪 8s → 印章 → 翻页 → 笔划 → 熄灯 → 脚步 → 判决），可直接播放。
