@@ -2,6 +2,7 @@
 import { renderScreen } from './screen.js';
 import { renderMobile, renderMobileSettle, isMobileView } from './mobile.js';
 import { renderIntro, renderIntroMobile } from './intro.js';
+import { audio } from './audio.js';
 import * as E from '../game/engine.js';
 import { compileSmart, chooseHole, remark, warm, llmOn } from './npc.js';
 
@@ -184,6 +185,7 @@ async function askWrite() {
     let local;
     try { local = E.compileRule(text); } catch (err) { local = { ok: false, error: '这句判不了。' }; }
     if (!local.ok) return toast(local.error || '这句判不了。');
+    audio.sfx('pen');
     const idx = g.rules.length;
     showVerdict(sheet, text, local, llmOn);
     compileSmart(text).then(function (r) {
@@ -210,6 +212,7 @@ async function askWrite() {
 
 function showVerdict(sheet, text, r, pending) {
   sheet.__result = r;
+  audio.sfx('paper');
   sheet.innerHTML =
     '<h3>归 档 完 毕</h3>' +
     '<p class="sub">你的话被译成了一条能执行的判定</p>' +
@@ -224,6 +227,7 @@ function showVerdict(sheet, text, r, pending) {
     const rr = sheet.__result || r;
     const w = E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note });
     if (!w.ok) return toast(w.error);
+    audio.sfx('stamp');
     wroteToday = true;
     closeSheet();
     syncView();
@@ -277,6 +281,8 @@ async function runNight() {
   const guess = holes[0].id;
   const route0 = E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1];
   view.phase = 'night'; syncView();
+  audio.setMode('night'); audio.sfx('lights');
+  setTimeout(function () { audio.sfx('steps'); }, 900 * SPEED);
   view.path = await pathFor(route0);
   view.report = [];
   await paint();
@@ -323,7 +329,7 @@ async function runNight() {
   await wait(1100);
   busy = false;
   if (g.escaped || g.nights.length >= g.maxDays) await showSettle();
-  else { dayBriefing(); await paint(); if (g.day === 6) askSick(); }
+  else { audio.setMode('day'); dayBriefing(); await paint(); if (g.day === 6) askSick(); }
 }
 
 function appendLine(live, ev, y) {
@@ -394,6 +400,7 @@ function askSick() {
 
 // ---------- 结算 ----------
 async function showSettle() {
+  audio.setMode('day'); audio.sfx('verdict');
   const s = E.settle(g);
   syncView();
   view.phase = 'settle'; view.path = null;
@@ -412,14 +419,16 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'start' || act === 'again') { newGame(); return; }
+  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') closeSheet();
   // 封面支持回车 / 空格开始
-  if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); newGame(); }
+  if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) {
+    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame();
+  }
 });
 // 手机 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
 let __wasMobile = isMobileView();
@@ -428,7 +437,10 @@ window.addEventListener('resize', () => {
   if (now !== __wasMobile) { __wasMobile = now; paint(); }
 });
 
+// 首次交互解锁音频（浏览器不允许页面加载即播放）；封面点击也会走这里
+document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
 // ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
 if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
 warm();   // 预热语言模型，别让第一条规矩撞上冷启动
 window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
+window.__audio = audio;

@@ -1,0 +1,22 @@
+import { launch, sleep } from './cdp.mjs';
+const p = await launch({ port: 9311, dir: 'C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-audio', w: 1600, h: 1000, scale: 1 });
+await p.init();
+const errs = [];
+const aud = [];
+p.on(m => {
+  if (m.method === 'Runtime.exceptionThrown') errs.push(m.params.exceptionDetails.exception ? m.params.exceptionDetails.exception.description : m.params.exceptionDetails.text);
+  if (m.method === 'Network.responseReceived' && /\.mp3/.test(m.params.response.url)) aud.push([m.params.response.url.split('/').pop(), m.params.response.status, m.params.response.mimeType]);
+});
+await p.send('Network.enable');
+await p.goto('http://127.0.0.1:7861/dist/index.html?intro=0&llm=0&seed=9');
+await sleep(800);
+console.log('CHECK', JSON.stringify(await p.ev(`({audio: !!window.__audio, mute: !!document.querySelector('#mute-btn'), slot: !!document.querySelector('[data-act=write]'), phase: window.__game.view.phase})`)));
+const rc = await p.ev(`(() => { const el = document.querySelector('[data-act=write]'); const r = el.getBoundingClientRect(); return {x: r.left + r.width/2, y: r.top + r.height/2}; })()`);
+await p.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: rc.x, y: rc.y, button: 'left', clickCount: 1 });
+await p.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: rc.x, y: rc.y, button: 'left', clickCount: 1 });
+await sleep(1800);
+console.log('SHEET', JSON.stringify(await p.ev(`({sheet: !!document.querySelector('#rtxt'), mute: window.__audio.muted})`)));
+console.log('DECODE', JSON.stringify(await p.ev(`(async () => { const a = new Audio('/static/sfx-stamp.mp3'); a.volume = 0; try { await a.play(); await new Promise(r => setTimeout(r, 400)); return {ok: true, ready: a.readyState, paused: a.paused, dur: a.duration}; } catch (e) { return {ok: false, err: String(e), ready: a.readyState}; } })()`)));
+console.log('AUDIO_REQ', JSON.stringify(aud));
+console.log('ERRS', JSON.stringify(errs));
+await p.close();

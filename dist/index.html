@@ -172,6 +172,17 @@ svg.intro { display: block; width: 100%; height: 100%; }
 .cover-seal { transition: opacity .18s ease; }
 .cover-seal:hover { opacity: .82; }
 .cover-seal:active { opacity: .68; }
+
+/* 声音开关：贴在舞台左上角，不随 SVG 重绘丢失 */
+#mute-btn { position: absolute; left: 1.6%; top: 3.2%; z-index: 30; width: 30px; height: 30px;
+  border-radius: 50%; border: 1px solid rgba(232,220,192,.35); background: rgba(26,21,18,.55);
+  color: #e8dcc0; font-family: var(--song); font-size: 13px; line-height: 1; cursor: pointer;
+  opacity: .6; transition: opacity .2s, background .2s; padding: 0; }
+#mute-btn:hover { opacity: 1; }
+#mute-btn.muted { color: #9c8e78; background: rgba(26,21,18,.3); }
+@media (max-width: 900px) and (orientation: portrait) {
+  #mute-btn { width: 22px; height: 22px; left: 1.2%; top: 12.2%; font-size: 10px; opacity: .4; }
+}
 </style>
 </head>
 <body>
@@ -371,6 +382,100 @@ function renderIntroMobile() {
 }
 
 M["intro"] = {renderIntro:renderIntro, renderIntroMobile:renderIntroMobile};
+})();
+/* ===== ui/audio.js ===== */
+(function(){
+// audio.js — 音频层：两条 BGM 交叉淡入 + 事件音效。首次用户操作后才启动（浏览器自动播放限制）。
+// 文件放创空间根目录，由 FastAPI 的 /static 提供；本地 server.mjs 也把 /static 映射到项目根。
+const BASE = '/static/';
+const FILES = {
+  day: 'audio-day.mp3', night: 'audio-night.mp3',
+  stamp: 'sfx-stamp.mp3', paper: 'sfx-paper.mp3', pen: 'sfx-pen.mp3',
+  lights: 'sfx-lights.mp3', steps: 'sfx-steps.mp3', verdict: 'sfx-verdict.mp3',
+};
+const VOL = { day: 0.16, night: 0.20, stamp: 0.55, paper: 0.45, pen: 0.35, lights: 0.5, steps: 0.45, verdict: 0.65 };
+let muted = false;
+try { muted = localStorage.getItem('cage-muted') === '1'; } catch (err) {}
+const bg = { day: null, night: null, mode: 'day', started: false, fade: null };
+
+function el(key) {
+  const a = new Audio(BASE + FILES[key]);
+  a.loop = true;
+  a.preload = 'auto';
+  a.volume = 0;
+  return a;
+}
+function ensure() {
+  if (!bg.day) { bg.day = el('day'); bg.night = el('night'); }
+}
+function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
+function fade() {
+  if (bg.fade) { clearInterval(bg.fade); bg.fade = null; }
+  if (!bg.day || muted) return;
+  const t0 = now();
+  const from = { day: bg.day.volume, night: bg.night.volume };
+  const to = { day: bg.mode === 'day' ? VOL.day : 0, night: bg.mode === 'night' ? VOL.night : 0 };
+  bg.fade = setInterval(function () {
+    const k = Math.min(1, (now() - t0) / 900);
+    bg.day.volume = from.day + (to.day - from.day) * k;
+    bg.night.volume = from.night + (to.night - from.night) * k;
+    if (k >= 1) { clearInterval(bg.fade); bg.fade = null; }
+  }, 40);
+}
+function playBg() {
+  ensure();
+  [bg.day, bg.night].forEach(function (a) {
+    const p = a.play();
+    if (p && p.catch) p.catch(function () {});
+  });
+  bg.started = true;
+  fade();
+}
+function pauseBg() {
+  if (bg.fade) { clearInterval(bg.fade); bg.fade = null; }
+  [bg.day, bg.night].forEach(function (a) { if (a) a.pause(); });
+}
+function paintBtn() {
+  const b = document.getElementById('mute-btn');
+  if (!b) return;
+  b.textContent = muted ? '静' : '音';
+  b.className = muted ? 'muted' : '';
+  b.setAttribute('aria-label', muted ? '开启声音' : '关闭声音');
+  b.title = muted ? '开启声音' : '关闭声音';
+}
+function mountBtn() {
+  if (document.getElementById('mute-btn')) { paintBtn(); return; }
+  const b = document.createElement('button');
+  b.id = 'mute-btn';
+  b.type = 'button';
+  b.addEventListener('click', function (ev) { ev.stopPropagation(); audio.toggle(); });
+  (document.getElementById('stage') || document.body).appendChild(b);
+  paintBtn();
+}
+const audio = {
+  get muted() { return muted; },
+  init() { ensure(); if (!muted) playBg(); },
+  setMode(mode) { bg.mode = mode === 'night' ? 'night' : 'day'; ensure(); if (bg.started) fade(); },
+  sfx(name) {
+    if (muted || !FILES[name]) return;
+    try {
+      const a = new Audio(BASE + FILES[name]);
+      a.volume = VOL[name] || 0.5;
+      const p = a.play();
+      if (p && p.catch) p.catch(function () {});
+    } catch (err) {}
+  },
+  toggle() {
+    muted = !muted;
+    try { localStorage.setItem('cage-muted', muted ? '1' : '0'); } catch (err) {}
+    if (muted) pauseBg(); else playBg();
+    paintBtn();
+  },
+};
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountBtn);
+else mountBtn();
+
+M["audio"] = {audio:audio};
 })();
 /* ===== ui/map.js ===== */
 (function(){
@@ -1023,7 +1128,7 @@ function buildMap() {
   ].join('');
 }
 
-M["map"] = {MAP_W:MAP_W, MAP_H:MAP_H, ROOM_RECTS:ROOM_RECTS, MAP_PATHS:MAP_PATHS, buildMap:buildMap};
+M["map"] = {MAP_W:MAP_W, MAP_H:MAP_H, ROOM_RECTS:ROOM_RECTS, MAP_PATHS:MAP_PATHS, portrait:portrait, buildMap:buildMap};
 })();
 /* ===== game/engine.js ===== */
 (function(){
@@ -1563,7 +1668,7 @@ M["npc"] = {llmOn:llmOn, compileSmart:compileSmart, chooseHole:chooseHole, remar
 // mobile.js — 手机竖屏版式：一屏纵向流（状态 → 简化平面图 → 狱规 → 状态条 → 巡查报告 → 入夜）。
 // 只换排版，不换规则、不换判定：桌面版仍是 screen.js 的 1600×1000。
   const { C, KAI, SONG, buildDefs, buildPaper } = M["paper"];
-  const { ROOM_RECTS, MAP_W, MAP_H } = M["map"];
+  const { ROOM_RECTS, MAP_W, MAP_H, portrait } = M["map"];
 const MW = 800, MH = 1840, MSH = 1500;
 const MX = 36, MY = 168, MS = 728 / MAP_W;
 const CN = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
@@ -1690,19 +1795,21 @@ function mapContent(st) {
     g += furniture(k, r);
     g += '<text x="' + (r[0] + 12) + '" y="' + (r[1] + 30) + '" font-family="' + SONG + '" font-size="23" fill="' + C.INK2 + '" stroke="' + C.PAPER + '" stroke-width="6" paint-order="stroke">' + esc(ROOM_NAMES[k] || k) + '</text>';
   }
-  // 两个人物：囚犯（红）与狱警（黑），位置沿用桌面版的档案小像
-  const tok = (cx, cy, label, color) =>
-    '<g><circle cx="' + cx + '" cy="' + cy + '" r="18" fill="' + color + '" opacity="0.9"/>' +
-    '<circle cx="' + cx + '" cy="' + (cy - 5) + '" r="6" fill="#f2e8d2"/>' +
-    '<text x="' + cx + '" y="' + (cy + 46) + '" text-anchor="middle" font-family="' + SONG + '" font-size="19" fill="' + C.INK2 + '">' + label + '</text></g>';
-  g += tok(345, 250, '他', C.RED);
-  g += tok(405, 394, '狱警', C.BRASS);
+  // 两个人物：与桌面版同一套「档案小像」线稿，放大 1.5 倍以适应手机尺寸
+  const TOKS = 1.5;
+  const tok = (cx, cy, label, kind, lc, id) =>
+    '<g' + (id ? ' id="' + id + '"' : '') + '><g transform="translate(' + cx + ' ' + cy + ') scale(' + TOKS + ')">' + portrait(0, 0, kind) + '</g>' +
+    '<text x="' + cx + '" y="' + (cy + 66) + '" text-anchor="middle" font-family="' + SONG + '" font-size="20" fill="' + lc + '">' + label + '</text></g>';
+  g += tok(345, 250, '他', 'prisoner', C.RED, 'token-prisoner');
+  g += tok(405, 394, '狱警', 'guard', C.STEEL, 'token-guard');
   return g;
 }
 
 function mapBlock(st) {
   const night = st.phase === 'night';
   let g = '<g id="map" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
+  g += '<defs><filter id="map-card-shadow" x="-60%" y="-60%" width="220%" height="220%">' +
+    '<feGaussianBlur stdDeviation="2.4"/></filter></defs>';
   g += mapContent(st);
   if (night) {
     const p = st.path;
@@ -1716,7 +1823,8 @@ function mapBlock(st) {
     if (p && p.length > 1) {
       const d = p.map((pt, i) => (i ? 'L' : 'M') + pt[0] + ' ' + pt[1]).join(' ');
       g += '<g id="nightpath"><path class="trail" d="' + d + '"/></g>';
-      g += '<g class="nptok"><circle r="18" fill="' + C.RED + '"/><circle cy="-5" r="6" fill="#f2e8d2"/><animateMotion dur="2.2s" fill="freeze" path="' + d + '"/></g>';
+      g += '<g class="nptok"><g transform="scale(1.25)">' + portrait(0, 0, 'prisoner') +
+        '</g><animateMotion dur="2.2s" fill="freeze" path="' + d + '"/></g>';
     }
   }
   g += '</g>';
@@ -2115,6 +2223,7 @@ M["screen"] = {W:W, cn:cn, renderScreen:renderScreen};
   const { renderScreen } = M["screen"];
   const { renderMobile, renderMobileSettle, isMobileView } = M["mobile"];
   const { renderIntro, renderIntroMobile } = M["intro"];
+  const { audio } = M["audio"];
   const E = M["engine"];
   const { compileSmart, chooseHole, remark, warm, llmOn } = M["npc"];
 const stage = document.getElementById('screen');
@@ -2296,6 +2405,7 @@ async function askWrite() {
     let local;
     try { local = E.compileRule(text); } catch (err) { local = { ok: false, error: '这句判不了。' }; }
     if (!local.ok) return toast(local.error || '这句判不了。');
+    audio.sfx('pen');
     const idx = g.rules.length;
     showVerdict(sheet, text, local, llmOn);
     compileSmart(text).then(function (r) {
@@ -2322,6 +2432,7 @@ async function askWrite() {
 
 function showVerdict(sheet, text, r, pending) {
   sheet.__result = r;
+  audio.sfx('paper');
   sheet.innerHTML =
     '<h3>归 档 完 毕</h3>' +
     '<p class="sub">你的话被译成了一条能执行的判定</p>' +
@@ -2336,6 +2447,7 @@ function showVerdict(sheet, text, r, pending) {
     const rr = sheet.__result || r;
     const w = E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note });
     if (!w.ok) return toast(w.error);
+    audio.sfx('stamp');
     wroteToday = true;
     closeSheet();
     syncView();
@@ -2389,6 +2501,8 @@ async function runNight() {
   const guess = holes[0].id;
   const route0 = E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1];
   view.phase = 'night'; syncView();
+  audio.setMode('night'); audio.sfx('lights');
+  setTimeout(function () { audio.sfx('steps'); }, 900 * SPEED);
   view.path = await pathFor(route0);
   view.report = [];
   await paint();
@@ -2435,7 +2549,7 @@ async function runNight() {
   await wait(1100);
   busy = false;
   if (g.escaped || g.nights.length >= g.maxDays) await showSettle();
-  else { dayBriefing(); await paint(); if (g.day === 6) askSick(); }
+  else { audio.setMode('day'); dayBriefing(); await paint(); if (g.day === 6) askSick(); }
 }
 
 function appendLine(live, ev, y) {
@@ -2506,6 +2620,7 @@ function askSick() {
 
 // ---------- 结算 ----------
 async function showSettle() {
+  audio.setMode('day'); audio.sfx('verdict');
   const s = E.settle(g);
   syncView();
   view.phase = 'settle'; view.path = null;
@@ -2524,14 +2639,16 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'start' || act === 'again') { newGame(); return; }
+  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') closeSheet();
   // 封面支持回车 / 空格开始
-  if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); newGame(); }
+  if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) {
+    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame();
+  }
 });
 // 手机 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
 let __wasMobile = isMobileView();
@@ -2540,10 +2657,13 @@ window.addEventListener('resize', () => {
   if (now !== __wasMobile) { __wasMobile = now; paint(); }
 });
 
+// 首次交互解锁音频（浏览器不允许页面加载即播放）；封面点击也会走这里
+document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
 // ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
 if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
 warm();   // 预热语言模型，别让第一条规矩撞上冷启动
 window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
+window.__audio = audio;
 M["app"] = {};
 })();
 

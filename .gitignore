@@ -1,4 +1,4 @@
-﻿# ---- 本地运行产物 / 缓存 ----
+# ---- 本地运行产物 / 缓存 ----
 __pycache__/
 *.pyc
 .upload/
@@ -41,3 +41,10 @@ tools/debug-*.mjs
 tools/tmp/
 tools/gradio-x/
 
+# ---- 音频实验产物（游戏用的是根目录 mp3；这些只是合成/试听中间件）----
+docs/audio/*.wav
+docs/audio/audition.*
+docs/audio/ab-audition.*
+docs/audio/bgm-archive.*
+docs/audio/sfx-*.mp3
+docs/audio/ref/

@@ -7,11 +7,13 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)));
 const MIME = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8',
   '.css':'text/css; charset=utf-8', '.png':'image/png', '.svg':'image/svg+xml',
-  '.json':'application/json; charset=utf-8', '.woff2':'font/woff2', '.ttf':'font/ttf' };
+  '.json':'application/json; charset=utf-8', '.woff2':'font/woff2', '.ttf':'font/ttf',
+  '.mp3':'audio/mpeg', '.wav':'audio/wav', '.m4a':'audio/mp4' };
 const port = +(process.env.PORT || 7861);
 
 http.createServer((req, res) => {
   let p = decodeURIComponent((req.url || '/').split('?')[0]);
+  if (p.indexOf('/static/') === 0) p = p.slice(7);  // 与创空间一致：/static 映射项目根
   if (p === '/') p = '/index.html';
   const file = path.join(root, p);
   if (!file.startsWith(root)) { res.writeHead(403).end('no'); return; }

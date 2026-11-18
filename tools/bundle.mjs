@@ -7,6 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const MODS = [
   ['paper', 'ui/paper.js'],
   ['intro', 'ui/intro.js'],
+  ['audio', 'ui/audio.js'],
   ['map', 'ui/map.js'],
   ['engine', 'game/engine.js'],
   ['npc', 'ui/npc.js'],
@@ -42,6 +43,7 @@ function modTag(p) {
   if (p.indexOf('engine') >= 0) return 'engine';
   if (p.indexOf('paper') >= 0) return 'paper';
   if (p.indexOf('intro') >= 0) return 'intro';
+  if (p.indexOf('audio') >= 0) return 'audio';
   if (p.indexOf('map') >= 0) return 'map';
   if (p.indexOf('npc') >= 0) return 'npc';
   if (p.indexOf('mobile') >= 0) return 'mobile';

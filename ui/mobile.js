@@ -1,7 +1,7 @@
 // mobile.js — 手机竖屏版式：一屏纵向流（状态 → 简化平面图 → 狱规 → 状态条 → 巡查报告 → 入夜）。
 // 只换排版，不换规则、不换判定：桌面版仍是 screen.js 的 1600×1000。
 import { C, KAI, SONG, buildDefs, buildPaper } from './paper.js';
-import { ROOM_RECTS, MAP_W, MAP_H } from './map.js';
+import { ROOM_RECTS, MAP_W, MAP_H, portrait } from './map.js';
 
 export const MW = 800, MH = 1840, MSH = 1500;
 const MX = 36, MY = 168, MS = 728 / MAP_W;
@@ -129,19 +129,21 @@ function mapContent(st) {
     g += furniture(k, r);
     g += '<text x="' + (r[0] + 12) + '" y="' + (r[1] + 30) + '" font-family="' + SONG + '" font-size="23" fill="' + C.INK2 + '" stroke="' + C.PAPER + '" stroke-width="6" paint-order="stroke">' + esc(ROOM_NAMES[k] || k) + '</text>';
   }
-  // 两个人物：囚犯（红）与狱警（黑），位置沿用桌面版的档案小像
-  const tok = (cx, cy, label, color) =>
-    '<g><circle cx="' + cx + '" cy="' + cy + '" r="18" fill="' + color + '" opacity="0.9"/>' +
-    '<circle cx="' + cx + '" cy="' + (cy - 5) + '" r="6" fill="#f2e8d2"/>' +
-    '<text x="' + cx + '" y="' + (cy + 46) + '" text-anchor="middle" font-family="' + SONG + '" font-size="19" fill="' + C.INK2 + '">' + label + '</text></g>';
-  g += tok(345, 250, '他', C.RED);
-  g += tok(405, 394, '狱警', C.BRASS);
+  // 两个人物：与桌面版同一套「档案小像」线稿，放大 1.5 倍以适应手机尺寸
+  const TOKS = 1.5;
+  const tok = (cx, cy, label, kind, lc, id) =>
+    '<g' + (id ? ' id="' + id + '"' : '') + '><g transform="translate(' + cx + ' ' + cy + ') scale(' + TOKS + ')">' + portrait(0, 0, kind) + '</g>' +
+    '<text x="' + cx + '" y="' + (cy + 66) + '" text-anchor="middle" font-family="' + SONG + '" font-size="20" fill="' + lc + '">' + label + '</text></g>';
+  g += tok(345, 250, '他', 'prisoner', C.RED, 'token-prisoner');
+  g += tok(405, 394, '狱警', 'guard', C.STEEL, 'token-guard');
   return g;
 }
 
 function mapBlock(st) {
   const night = st.phase === 'night';
   let g = '<g id="map" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
+  g += '<defs><filter id="map-card-shadow" x="-60%" y="-60%" width="220%" height="220%">' +
+    '<feGaussianBlur stdDeviation="2.4"/></filter></defs>';
   g += mapContent(st);
   if (night) {
     const p = st.path;
@@ -155,7 +157,8 @@ function mapBlock(st) {
     if (p && p.length > 1) {
       const d = p.map((pt, i) => (i ? 'L' : 'M') + pt[0] + ' ' + pt[1]).join(' ');
       g += '<g id="nightpath"><path class="trail" d="' + d + '"/></g>';
-      g += '<g class="nptok"><circle r="18" fill="' + C.RED + '"/><circle cy="-5" r="6" fill="#f2e8d2"/><animateMotion dur="2.2s" fill="freeze" path="' + d + '"/></g>';
+      g += '<g class="nptok"><g transform="scale(1.25)">' + portrait(0, 0, 'prisoner') +
+        '</g><animateMotion dur="2.2s" fill="freeze" path="' + d + '"/></g>';
     }
   }
   g += '</g>';

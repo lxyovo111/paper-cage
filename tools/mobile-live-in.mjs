@@ -1,0 +1,42 @@
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+const EDGE = 'C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const PORT = 9321;
+const proc = spawn(EDGE, ['--headless=new','--disable-gpu','--no-sandbox','--hide-scrollbars','--force-device-scale-factor=2','--window-size=390,844','--remote-debugging-port='+PORT,'--user-data-dir=C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-mlive2','about:blank'], { stdio: 'ignore' });
+let ver = null;
+for (let i = 0; i < 60 && !ver; i++) { try { ver = await (await fetch('http://127.0.0.1:'+PORT+'/json/version')).json(); } catch(_) { await sleep(250); } }
+const ws = new WebSocket(ver.webSocketDebuggerUrl);
+await new Promise((res, rej) => { ws.onopen = res; ws.onerror = rej; });
+let id = 0; const pending = new Map();
+ws.onmessage = ev => { const m = JSON.parse(ev.data); if (m.id && pending.has(m.id)) { const p = pending.get(m.id); pending.delete(m.id); if (m.error) p.rej(new Error(JSON.stringify(m.error))); else p.res(m.result); } };
+const send = (method, params = {}, sessionId) => new Promise((res, rej) => { const i = ++id; pending.set(i, {res, rej}); const msg = { id: i, method, params }; if (sessionId) msg.sessionId = sessionId; ws.send(JSON.stringify(msg)); });
+const { targetId } = await send('Target.createTarget', { url: 'about:blank' });
+const root = await send('Target.attachToTarget', { targetId, flatten: true });
+const S = root.sessionId;
+await send('Page.enable', {}, S); await send('Runtime.enable', {}, S);
+await send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, S);
+await send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }, S);
+await send('Emulation.setUserAgentOverride', { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1' }, S);
+await send('Page.navigate', { url: 'https://modelscope.cn/studios/lxyovo/six-rules' }, S);
+await sleep(15000);
+const t2 = await send('Target.getTargets');
+const ti = t2.targetInfos.find(t => (t.url || '').indexOf('six-rules.ms.show') >= 0);
+console.log('IFRAME', ti ? ti.url.slice(0, 70) : 'none');
+let click = 'noiframe'; let info = '';
+if (ti) {
+  const a = await send('Target.attachToTarget', { targetId: ti.targetId, flatten: true });
+  const F = a.sessionId;
+  await send('Runtime.enable', {}, F);
+  await sleep(2500);
+  const ev = async expr => { const r = await send('Runtime.evaluate', { expression: expr, awaitPromise: true, returnByValue: true }, F); if (r.exceptionDetails) throw new Error(JSON.stringify(r.exceptionDetails).slice(0,150)); return r.result.value; };
+  console.log('PRE', await ev('JSON.stringify({vb:(document.querySelector("svg")||{}).getAttribute?document.querySelector("svg").getAttribute("viewBox"):null, seal:!!document.querySelector("[data-act=start]")})'));
+  click = await ev('(()=>{const el=document.querySelector("[data-act=start]"); if(!el) return "noseal"; el.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window})); return "ok";})()');
+  await sleep(2800);
+  info = await ev('JSON.stringify({phase:(window.__game&&window.__game.view&&window.__game.view.phase)||null, tok:!!document.querySelector("#token-prisoner"), guard:!!document.querySelector("#token-guard"), vb:(document.querySelector("svg")||{getAttribute:()=>null}).getAttribute("viewBox")})');
+}
+console.log('CLICK', click, 'INFO', info);
+const shot = await send('Page.captureScreenshot', { format: 'png' }, S);
+fs.writeFileSync('tools/m-live-game.png', Buffer.from(shot.data, 'base64'));
+console.log('SHOT ok');
+try { ws.close(); } catch(_) {} proc.kill();

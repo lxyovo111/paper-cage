@@ -49,6 +49,13 @@
 
 链接后加 ?llm=0 ：路线退化成「按顺序试第一条」，夜间独白退化成模板句，**判定一次都没变** —— 规矩还是那六条，输赢还是引擎算的。变的只是他像不像一个人。
 
+## 声音
+
+- 两条底噪：白天案卷（写规矩、翻报告）与夜间巡视（熄灯后），交叉淡入 900ms，循环。
+- 五个事件音效：红章 / 翻页 / 笔划 / 熄灯 / 脚步；判决书落下另有一下。
+- 左上角小圆钮是静音开关，状态存在本机；**首次点击之后才出声**（浏览器的自动播放限制）。
+- 全部是程序化合成（NumPy 数学波形与噪声），没有使用第三方录音或素材库；配乐与音效在项目根目录，由 `/static/` 提供。来源与复现见 [docs/audio/README.md](docs/audio/README.md)。
+
 ## 代码结构
 
     app.py             魔搭创空间入口：Gradio 挂根路径（平台会劫持 /config），游戏本体由 FastAPI 直出 /play
@@ -59,6 +66,8 @@
     ui/mobile.js       手机竖屏版式：同一份 state 重排成纵向流，夜里复用同一套路径与夜报坐标折算
     ui/app.js          主控：写规矩 → 编译回显 → 入夜 → 预判 → 夜报逐条打印 → 次日 → 结算
     ui/npc.js          AI 三处用途 + 超时 + 本地降级 + ?llm=0 开关
+    ui/audio.js        两条 BGM 交叉淡入 + 事件音效 + 静音开关（首次交互后启动）
+    audio-day.mp3      白天底噪；audio-night.mp3 夜间底噪；sfx-*.mp3 六个音效（由 /static/ 提供）
     game/engine.js     确定性规则引擎：规矩编译、强度定价、漏洞枚举、逐夜模拟、结算
     game/play7.mjs     无头跑七天：node game/play7.mjs careful 7
     tools/bundle.mjs   把源码拼成自包含的 dist/index.html
@@ -68,7 +77,7 @@
 
 ## 本地跑
 
-    node server.mjs                 # http://127.0.0.1:7861/dist/index.html
+    node server.mjs                 # http://127.0.0.1:7861/dist/index.html（/static/* 映射项目根，音频同创空间）
     node tools/bundle.mjs           # 改完 ui/ game/ 后重新打包 dist/index.html
     node game/play7.mjs careful 7   # 无头模拟：每天写一条窄规矩，打印夜间事件
 
@@ -100,8 +109,8 @@ AI 需要魔搭 API Inference 的 token（环境变量 MODELSCOPE_API_KEY），�
 ## 已知限制
 
 - AI 延迟不由我们控制：同一模型在不同时段 0.7s 到 25s 都有。所以编译采用「本地判定先出、AI 事后校准」，夜间一句话设 5 到 7.5 秒竞速，超时就模板兜底。
-- 手机端尚未适配（一屏信息密度是按桌面 16:10 设计的）。
-- 没有音效。
+- 音频必须等第一次点击才开始（浏览器规定），静音开关可以关掉全部声音。
+- 手机竖屏是独立纵向版式（不是把桌面版缩小），横屏与桌面仍是横版。
 
 ## License
 
