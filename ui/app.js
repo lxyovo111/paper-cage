@@ -324,16 +324,23 @@ async function runNight() {
     routeName: res.route.name, outcome: res.outcome, blocked: blk ? blk.text : '',
   }).catch(() => null);
   const live = stage.querySelector('#report-live');
+  // 第五夜起他一夜走两步，事件会比以前多；先把「熄灯」这类气氛行省掉，保证两个动作都能看见
+  const evs = res.events.slice();
+  const compact = res.events.length > 5;   // 按原始条数判断，否则删掉「熄灯」后又被判成宽松排版，最后一条会被挤掉
+  if (compact) { const si = evs.findIndex(function (e) { return e.kind === 'start'; }); if (si >= 0) evs.splice(si, 1); }
+  const mobileView = isMobileView();
+  const pitch = compact ? (mobileView ? 20 : 24) : 30;
+  const maxY = compact ? (mobileView ? 892 : 912) : 906;
   let y = 792;
-  for (const ev of res.events) {
-    if (y > 906) break;
-    appendLine(live, ev, y);
-    y += ev.kind === 'escape' ? 34 : 30;
+  for (const ev of evs) {
+    if (y > maxY) break;
+    appendLine(live, ev, y, compact);
+    y += ev.kind === 'escape' ? pitch + 4 : pitch;
     await wait(ev.kind === 'escape' ? 1400 : 950);
   }
   // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。
   const rk = await Promise.race([remarkP, wait(7500).then(() => null)]);
-  const noteEl = y <= 912 ? appendLine(live, { t: '', text: (rk && rk.line) || localNightLine(res.outcome), kind: 'note', id: 'remark-line' }, y) : null;
+  const noteEl = y <= maxY + 6 ? appendLine(live, { t: '', text: (rk && rk.line) || localNightLine(res.outcome), kind: 'note', id: 'remark-line' }, y, compact) : null;
   aiStat.lines += 1;
   if (rk && rk.line && rk.by === 'llm') aiStat.linesLLM += 1;
   if (noteEl && (!rk || rk.by !== 'llm')) {
@@ -350,7 +357,7 @@ async function runNight() {
   else { audio.setMode('day'); dayBriefing(); await paint(); if (g.day === 6) askSick(); }
 }
 
-function appendLine(live, ev, y) {
+function appendLine(live, ev, y, compact) {
   if (!live) return null;
   const NS = 'http://www.w3.org/2000/svg';
   // 版式换算：桌面版直接用屏幕坐标；手机版由 #report-live 的 data-cfg 折算（同一套打字逻辑）
@@ -359,7 +366,7 @@ function appendLine(live, ev, y) {
   const k = cfg ? cfg.k : 1;
   const Y = cfg ? cfg.y0 + (y - 792) * k : y;
   const X1 = cfg ? cfg.x1 : 252, X2 = cfg ? cfg.x2 : 306;
-  const FS = cfg ? cfg.fs : null;
+  const FS = cfg ? Math.round(cfg.fs * (compact ? 0.86 : 1)) : null;
   const COLS = cfg ? cfg.cols : 42;
   const color = { block:'#882e1f', leak:'#882e1f', catch:'#544a3c', escape:'#882e1f', event:'#80603c', note:'#7e6f5c' }[ev.kind] || '#40372d';
   const font = ev.kind === 'event' || ev.kind === 'note' ? 'KaiTi' : 'SimSun';
@@ -369,13 +376,13 @@ function appendLine(live, ev, y) {
   const box = document.createElementNS(NS, 'g');
   const t0 = document.createElementNS(NS, 'text');
   t0.setAttribute('x', String(X1)); t0.setAttribute('y', String(Y));
-  t0.setAttribute('font-size', String(FS ? Math.round(FS * 0.72) : 12)); t0.setAttribute('fill', '#7e6f5c');
+  t0.setAttribute('font-size', String(FS ? Math.round(FS * 0.72) : (compact ? 11 : 12))); t0.setAttribute('fill', '#7e6f5c');
   t0.setAttribute('letter-spacing', '0.5'); t0.textContent = ev.t || '';
   box.appendChild(t0);
   rows.slice(0, 2).forEach((row, i) => {
     const t = document.createElementNS(NS, 'text');
-    t.setAttribute('x', String(X2)); t.setAttribute('y', String(Y + (cfg ? i * FS * 1.3 : i * 21)));
-    t.setAttribute('font-size', String(FS || (ev.kind === 'event' ? 14 : 15.5)));
+    t.setAttribute('x', String(X2)); t.setAttribute('y', String(Y + (cfg ? i * FS * (compact ? 1.16 : 1.3) : i * (compact ? 16 : 21))));
+    t.setAttribute('font-size', String(FS || (compact ? 14 : (ev.kind === 'event' ? 14 : 15.5))));
     t.setAttribute('font-family', font);
     t.setAttribute('fill', i ? '#7e6f5c' : color);
     t.textContent = row;

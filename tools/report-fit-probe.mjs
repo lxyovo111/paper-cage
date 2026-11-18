@@ -1,0 +1,28 @@
+import { spawn } from 'node:child_process';
+import fs from 'node:fs';
+const EDGE='C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe';
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const PORT=9343;
+const DIR='C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\reportfit';
+fs.mkdirSync(DIR,{recursive:true});
+const proc=spawn(EDGE,['--headless=new','--disable-gpu','--no-sandbox','--hide-scrollbars','--window-size=1600,1000','--remote-debugging-port='+PORT,'--user-data-dir=C:\\Users\\lcj\\Desktop\\tap\\six-rules\\tools\\edge-rfit','about:blank'],{stdio:'ignore'});
+let ver=null; for(let i=0;i<80&&!ver;i++){try{ver=await(await fetch('http://127.0.0.1:'+PORT+'/json/version')).json();}catch(_){await sleep(250);}}
+const ws=new WebSocket(ver.webSocketDebuggerUrl); await new Promise((res,rej)=>{ws.onopen=res;ws.onerror=rej;});
+let id=0; const pending=new Map();
+ws.onmessage=e=>{const m=JSON.parse(e.data); if(m.id&&pending.has(m.id)){const p=pending.get(m.id);pending.delete(m.id);m.error?p.rej(new Error(JSON.stringify(m.error))):p.res(m.result);}};
+const send=(method,params={},sid)=>new Promise((res,rej)=>{const i=++id;pending.set(i,{res,rej});const msg={id:i,method,params};if(sid)msg.sessionId=sid;ws.send(JSON.stringify(msg));});
+const {targetId}=await send('Target.createTarget',{url:'about:blank'});
+const root=await send('Target.attachToTarget',{targetId,flatten:true}); const S=root.sessionId;
+await send('Page.enable',{},S); await send('Runtime.enable',{},S);
+await send('Emulation.setDeviceMetricsOverride',{width:1600,height:1000,deviceScaleFactor:1,mobile:false},S);
+await send('Page.navigate',{url:'http://127.0.0.1:7861/dist/index.html?intro=0&llm=0&seed=9'},S);
+await sleep(3200);
+const ev=async expr=>{const r=await send('Runtime.evaluate',{expression:expr,awaitPromise:true,returnByValue:true},S); if(r.exceptionDetails) return 'ERR '+JSON.stringify(r.exceptionDetails).slice(0,180); return r.result.value;};
+console.log('SET', await ev('(()=>{const G=window.__game; G.g.day=4; G.g.tutorialPending=false; G.g.ap=3; G.g.progress=null; G.syncView&&G.syncView(); return JSON.stringify({day:G.g.day,ap:G.g.ap});})()'));
+await ev('(()=>{const b=document.querySelector("[data-act=night]"); b.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}));})()');
+await sleep(500);
+await ev('(()=>{const b=document.querySelector("[data-k=skip]"); b.dispatchEvent(new MouseEvent("click",{bubbles:true,cancelable:true,view:window}));})()');
+await sleep(9000);
+console.log('REPORT', await ev('(()=>{const live=document.querySelector("#report-live"); if(!live) return "none"; const gs=[...live.children]; return JSON.stringify({n:gs.length,items:gs.map(g=>[...g.querySelectorAll("text")].map(t=>t.textContent).join(" | ")),fs:gs.map(g=>{const t=g.querySelector("text[font-size]"); return t?t.getAttribute("font-size"):null;})});})()'));
+const shot=await send('Page.captureScreenshot',{format:'png'},S); fs.writeFileSync(DIR+'\\desk.png',Buffer.from(shot.data,'base64'));
+try{ws.close();}catch(_){} proc.kill(); console.log('DONE');
