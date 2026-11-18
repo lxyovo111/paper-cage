@@ -30,11 +30,12 @@ export const PARAMS = {
   obedienceFloor: 5,
   broadZonePenalty: 0.62,     // 「全区域」的规矩执行时要跑遍整座监狱 → 打六二折
   broadTimePenalty: 0.80,     // 「全时段」→ 打八折
-  catchBase: 0.13, catchObedience: 0.27, catchWarned: 0.28, catchFatigue: 0.0015,
+  catchBase: 0.10, catchObedience: 0.24, catchWarned: 0.24, catchFatigue: 0.0015,
   hostilityRule: 5, hostilityBlocked: 2, hostilityCaught: 8, hostilitySlip: 3,
   despairCaught: 10, despairBlocked: 3,
   nightStart: 21 * 60 + 50,   // 熄灯 21:50：他动手时刚好过 22:00，「入夜」类规矩才管得住
   escapeEarliestNight: 3,   // 前两夜只踩点/准备，不算逃
+  rushFromDay: 4,           // 第 4 夜起他急了：一夜走两步
   stepMinutes: 20,
 };
 
@@ -61,25 +62,25 @@ export const ROUTES = [
 
 // 他绕开你写过的规矩之后，会自己想别的办法。敌意越高，花样越多。
 export const IMPROV = [
-  { id:'door', name:'食堂的后门', intent:'撬门', minHostility:40, minDay:3, steps:[
+  { id:'door', name:'食堂的后门', intent:'撬门', minHostility:35, minDay:2, steps:[
     { room:'workshop', act:'TAKE',  item:'iron', label:'从工具间取走一根铁条' },
     { room:'dining',   act:'MOVE',  item:null,   label:'在后门前面蹲了一会儿' },
     { room:'dining',   act:'BREAK', item:'door', label:'用铁条撬食堂的后门' },
     { room:'dining',   act:'MOVE',  item:null,   label:'从后门溜到放风区' } ]},
-  { id:'rope', name:'床单做的绳', intent:'翻墙', minHostility:45, minDay:3, steps:[
+  { id:'rope', name:'床单做的绳', intent:'翻墙', minHostility:40, minDay:2, steps:[
     { room:'laundry', act:'TAKE',  item:'sheet', label:'把两条床单接在一起' },
     { room:'medical', act:'MOVE',  item:null,    label:'在医务室的窗边比了比长度' },
     { room:'medical', act:'CLIMB', item:'window', label:'从医务室的窗把床单放下去' } ]},
-  { id:'copy', name:'配一把钥匙', intent:'钥匙', minHostility:55, minDay:4, steps:[
+  { id:'copy', name:'配一把钥匙', intent:'钥匙', minHostility:50, minDay:3, steps:[
     { room:'workshop', act:'TAKE', item:'iron', label:'从工具间取走一根铁条' },
     { room:'corridor', act:'TAKE', item:'key',  label:'趁狱警打盹拓下钥匙的齿形' },
     { room:'yard',     act:'MOVE', item:null,   label:'在闸门前来回走了两趟' },
     { room:'yard',     act:'CLIMB', item:'gate', label:'用配的钥匙开闸门' } ]},
-  { id:'riot', name:'放风区起哄', intent:'趁乱', minHostility:65, minDay:5, steps:[
+  { id:'riot', name:'放风区起哄', intent:'趁乱', minHostility:60, minDay:4, steps:[
     { room:'yard',     act:'CONFRONT', item:'inmate', label:'在放风区煽动其他犯人' },
     { room:'corridor', act:'MOVE',     item:null,     label:'趁乱混进走廊' },
     { room:'corridor', act:'CLIMB',    item:'gate',   label:'从走廊尽头的铁门出去' } ]},
-  { id:'sick', name:'装病', intent:'骗门', minHostility:50, minDay:4, steps:[
+  { id:'sick', name:'装病', intent:'骗门', minHostility:45, minDay:3, steps:[
     { room:'medical', act:'MOVE',  item:null,      label:'在药柜前面蹲下来' },
     { room:'medical', act:'BREAK', item:'cabinet', label:'装病骗开医务室的药柜' },
     { room:'medical', act:'CLIMB', item:'window',  label:'从药柜后的窗爬出去' } ]},
@@ -201,6 +202,7 @@ export function ruleStrength(state, rule) {
   if (state.obedience < 45) p *= 0.55 + 0.45 * (state.obedience / 45);   // 服从度垮了，纸上的规矩就没人执行
   if (state.blackout) p *= 0.70;
   p *= Math.max(0.55, 1 - 0.08 * (rule.leaks || 0));   // 漏过一次的规矩，下次更容易被摸清
+  p *= Math.max(0.45, 1 - 0.10 * (rule.wear || 0));    // 同一句话拦过他好几次，他就把那句话背下来了
   return Math.max(0.15, Math.min(1, p));
 }
 
@@ -322,8 +324,8 @@ export function simulateNight(state, choice = {}) {
   // 他昨天已经做完的步骤不会白做：接着上次的位置往下走
   const done = (state.progress && state.progress.routeId === route.id) ? state.progress.done : 0;
   let steps = route.steps.slice(done);
-  // 第一次上这条路线，一夜只做第一步——总得给你留一夜反应的时间
-  if (steps.length > 1) steps = steps.slice(0, 1);   // 一夜只走一步：每一步之间都得给你留反应时间
+  // 前几夜一夜只走一步，总得给你留反应时间；第五夜起他等不及了，一夜走两步
+  if (steps.length > 1) steps = steps.slice(0, state.day >= PARAMS.rushFromDay ? 2 : 1);
   // 前三夜他还在摸：不做这条路线的最后一步
   let scouted = false;
   if (steps.length && done + steps.length === route.steps.length && state.day < PARAMS.escapeEarliestNight) {
@@ -352,6 +354,7 @@ export function simulateNight(state, choice = {}) {
     if (blk) {
       lastBlk = blk;
       state.grudge[blk.id] = (state.grudge[blk.id] || 0) + 1;
+      blk.wear = (blk.wear || 0) + 1;
       const strength = ruleStrength(state, blk);
       if (rng() < strength) {
         const brave = state.hostility >= 70 || state.despair >= 75;

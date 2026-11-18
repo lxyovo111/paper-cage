@@ -123,11 +123,12 @@ body{
 
 /* ---- 夜：路径逐段画出，人物小像沿路径移动 ---- */
 @keyframes npdraw { from { stroke-dashoffset: 100 } to { stroke-dashoffset: 0 } }
-#np { animation: npdraw 2s linear forwards; }
+#np { animation: npdraw 3.4s linear forwards; }
 @keyframes tokIn { to { opacity: 1 } }
-.nptok { opacity: 0; animation: tokIn .45s .1s forwards; }
+@keyframes ntmove { from { offset-distance: 0% } to { offset-distance: 100% } }
+.nptok { opacity: 0; filter: brightness(.62) saturate(.75) sepia(.14);
+  animation: tokIn .45s .1s forwards, ntmove 3.4s linear forwards; }
 svg.night #token-prisoner { opacity: 0; }
-.nptok { filter: brightness(.62) saturate(.75) sepia(.14); }
 
 /* ---------- 手机竖屏：纵向版式（不是缩放，是重排） ---------- */
 @media (max-width: 900px) and (orientation: portrait) {

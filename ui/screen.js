@@ -211,10 +211,10 @@ function nightLayer(st) {
   const line =
     '<g transform="translate(204,182) scale(1.0726)">' +
     '<path d="' + d + '" fill="none" stroke="#f2e6cf" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.10"/>' +
-    '<path id="np" d="' + d + '" pathLength="100" fill="none" stroke="#a33323" stroke-width="2.2" ' +
+    '<path id="np" d="' + d + '" pathLength="100" fill="none" stroke="#a33323" stroke-width="2.6" ' +
     'stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="100" stroke-dashoffset="0" opacity="0.92"/>' +
-    '<g class="nptok"><use href="#token-prisoner" transform="translate(-345 -250)"/>' +
-    '<animateMotion dur="2s" fill="freeze" path="' + d + '"/></g>' +
+    '<g class="nptok" style="offset-path:path(\'' + d + '\');offset-rotate:0deg">' +
+    '<g transform="scale(1.18)"><use href="#token-prisoner" transform="translate(-345 -250)"/></g></g>' +
     '</g>';
   return defs + dim + line;
 }

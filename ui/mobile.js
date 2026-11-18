@@ -157,8 +157,8 @@ function mapBlock(st) {
     if (p && p.length > 1) {
       const d = p.map((pt, i) => (i ? 'L' : 'M') + pt[0] + ' ' + pt[1]).join(' ');
       g += '<g id="nightpath"><path class="trail" d="' + d + '"/></g>';
-      g += '<g class="nptok"><g transform="scale(1.25)">' + portrait(0, 0, 'prisoner') +
-        '</g><animateMotion dur="2.2s" fill="freeze" path="' + d + '"/></g>';
+      g += '<g class="nptok" style="offset-path:path(\'' + d + '\');offset-rotate:0deg">' +
+        '<g transform="scale(1.25)">' + portrait(0, 0, 'prisoner') + '</g></g>';
     }
   }
   g += '</g>';

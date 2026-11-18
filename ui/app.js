@@ -294,7 +294,7 @@ async function runNight() {
   const holes = E.enumerateHoles(g);
   // AI 的「决定」：引擎先把所有真实漏洞算清，LLM 只能在这张清单里挑一条最像人的；
   // 挑完仍由引擎逐条校验、执行。关掉 AI（?llm=0）就退回「第一条最松的路」，这就是 ablation。
-  // 与动画并行：让 AI 挑路线的时间藏在「熄灯 + 画夜路」的 2 秒里
+  // 与动画并行：让 AI 挑路线的时间藏在「熄灯 + 画夜路」的 3.5 秒里
   const pickP = chooseHole(holes, g).catch(() => null);
   const guess = holes[0].id;
   const route0 = E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1];
@@ -304,7 +304,7 @@ async function runNight() {
   view.path = await pathFor(route0);
   view.report = [];
   await paint();
-  await wait(2100);
+  await wait(3500);
   const pick = await pickP;
   aiStat.picks += 1;
   if (pick && pick.by === 'llm') aiStat.picksLLM += 1;
@@ -313,7 +313,7 @@ async function runNight() {
   if (actual !== guess && route !== route0) {
     view.path = await pathFor(route);
     await paint();
-    await wait(900);
+    await wait(2200);
   }
 
   const res = E.simulateNight(g, { routeId: actual });
@@ -329,7 +329,7 @@ async function runNight() {
     if (y > 906) break;
     appendLine(live, ev, y);
     y += ev.kind === 'escape' ? 34 : 30;
-    await wait(ev.kind === 'escape' ? 1100 : 760);
+    await wait(ev.kind === 'escape' ? 1400 : 950);
   }
   // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。
   const rk = await Promise.race([remarkP, wait(7500).then(() => null)]);
