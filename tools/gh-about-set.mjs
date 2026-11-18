@@ -10,7 +10,7 @@ await new Promise(r=>setTimeout(r,7000));
 await b.ev("(()=>{const c=[...document.querySelectorAll('button')].find(e=>(e.getAttribute('aria-label')||'').toLowerCase().includes('metadata'));if(c)c.click();return true;})()", sid);
 await new Promise(r=>setTimeout(r,2500));
 const setter = "(sel,val)=>{const el=document.querySelector(sel);if(!el)return 'missing '+sel;const proto=el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,val);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return 'ok';}";
-const desc = '《第七夜》：一个玩家、七天、最多六条规矩，关住一个每天夜里都在找漏洞的囚犯。规矩由玩家用自然语言写，AI 把它译成可执行的判定条、从引擎算出的漏洞清单里挑今夜走哪条路、并写一句他此刻的样子。判定归引擎，生成归 AI。魔搭创空间可玩。';
+const desc = '《纸上牢笼》：一个玩家、七天、最多六条规矩，关住一个每天夜里都在找漏洞的囚犯。规矩由玩家用自然语言写，AI 把它译成可执行的判定条、从引擎算出的漏洞清单里挑今夜走哪条路、并写一句他此刻的样子。判定归引擎，生成归 AI。魔搭创空间可玩。';
 const expr = '(()=>{const set=' + setter + ';const r={};r.desc=set("input[placeholder=\\"Short description of this repository\\"]",' + JSON.stringify(desc) + ');r.site=set("input[placeholder=\\"Enter a valid URL\\"]","https://modelscope.cn/studios/lxyovo/six-rules");const tp=document.querySelector("input[placeholder=\\"Add topics\\"]");if(tp){r.topics=[];for(const tag of ["ai-game","llm","game-jam","modelscope","svg"]){const d=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value");d.set.call(tp,tag);tp.dispatchEvent(new Event("input",{bubbles:true}));tp.dispatchEvent(new KeyboardEvent("keydown",{key:"Enter",code:"Enter",keyCode:13,which:13,bubbles:true}));r.topics.push(tag);}}return r;})()';
 const filled = await b.ev(expr, sid);
 console.log('FILL', JSON.stringify(filled));

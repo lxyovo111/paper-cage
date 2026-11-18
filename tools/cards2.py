@@ -33,7 +33,7 @@ def ab_card():
     d.line([250*S, 660*S, 1350*S, 660*S], fill=INK2, width=1)
     txt(d, (800, 730), "判定一次都没变：规矩还是那六条，输赢还是引擎算的。", 22, SONG, INK2)
     txt(d, (800, 786), "变的只是 —— 他像不像一个人。", 30, KAI, RED, tracking=2)
-    txt(d, (800, 900), "第七夜 · AI 与同名对照组", 14, SONG, MUTED, tracking=2)
+    txt(d, (800, 900), "纸上牢笼 · AI 与对照组", 14, SONG, MUTED, tracking=2)
     im = im.resize((W, H), Image.LANCZOS)
     im.save("C:/Users/lcj/Desktop/tap/six-rules/tools/card-ab.jpg", quality=92)
 

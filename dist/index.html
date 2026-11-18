@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>第七夜</title>
+<title>纸上牢笼</title>
 <script src="//g.alicdn.com/code/lib/iframe-resizer/4.3.2/iframeResizer.contentWindow.min.js"></script>
 <style>
 :root{
@@ -315,7 +315,7 @@ function seal(cx, cy, n, label, rot) {
 const LINES = [
   "你写一句人话，它被译成一条能执行的条件。",
   "他每晚只走一条缝；AI 替他挑，判定归引擎。",
-  "第七夜之后，是一张判决书。",
+  "七夜之后，是一张判决书。",
 ];
 
 function renderIntro() {
@@ -332,7 +332,7 @@ function renderIntro() {
   s += trail([[132, 906], [300, 906], [300, 946], [1300, 946], [1300, 906], [1468, 906]], 0.07);
   // 标题区
   s += T(800, 258, "二 〇 二 六 · 冬", { size: 13, fill: C.MUT2, tracking: 6, anchor: "middle" });
-  s += T(800, 440, "第 七 夜", { size: 168, tracking: 20, anchor: "middle" });
+  s += T(800, 440, "纸 上 牢 笼", { size: 152, tracking: 22, anchor: "middle" });
   s += H(650, 492, 950, 492, { opacity: 0.42, w: 1.2 });
   s += T(800, 566, "七天，最多六条规矩", { size: 38, anchor: "middle", tracking: 4 });
   s += T(800, 620, "关住一个每天夜里都在找漏洞的人", { size: 38, anchor: "middle", tracking: 2 });
@@ -356,7 +356,7 @@ function renderIntroMobile() {
   // 空白处留一条淡路径，第 1030–1180 一带
   s += trail([[70, 1180], [250, 1180], [250, 1060], [520, 1060], [520, 980], [740, 980]], 0.07);
   s += T(400, 250, "二 〇 二 六 · 冬", { size: 17, fill: C.MUT2, tracking: 6, anchor: "middle" });
-  s += T(400, 410, "第 七 夜", { size: 138, tracking: 8, anchor: "middle" });
+  s += T(400, 410, "纸 上 牢 笼", { size: 106, tracking: 6, anchor: "middle" });
   s += H(270, 456, 530, 456, { opacity: 0.42, w: 1.2 });
   s += T(400, 534, "七天，最多六条规矩", { size: 34, anchor: "middle", tracking: 3 });
   s += T(400, 584, "关住一个每天夜里都在找漏洞的人", { size: 30, anchor: "middle", tracking: 1 });
@@ -374,7 +374,7 @@ M["intro"] = {renderIntro:renderIntro, renderIntroMobile:renderIntroMobile};
 })();
 /* ===== ui/map.js ===== */
 (function(){
-// ui/map.js — 《第七夜》监狱平面图（纯 SVG 字符串，无 DOM、无依赖）
+// ui/map.js — 《纸上牢笼》监狱平面图（纯 SVG 字符串，无 DOM、无依赖）
 //
 // 坐标系与 render.py 的 map 段完全一致：单位沿用概念稿数值，1:1 直接抄，
 // 地图纸张区域是 x 16..764 / y 16..508，所以 viewBox 用 "0 0 764 520"。
@@ -1027,7 +1027,7 @@ M["map"] = {MAP_W:MAP_W, MAP_H:MAP_H, ROOM_RECTS:ROOM_RECTS, MAP_PATHS:MAP_PATHS
 })();
 /* ===== game/engine.js ===== */
 (function(){
-// engine.js — 《第七夜》确定性规则引擎
+// engine.js — 《纸上牢笼》确定性规则引擎
 // 纯逻辑：无 DOM、无网络、可复现。所有判定都在这里，LLM 只负责把玩家的话编译成判定条、
 // 把引擎算出的漏洞写成一句话。改数值请改 PARAMS，改规则语义请改 ruleBlocks。
 

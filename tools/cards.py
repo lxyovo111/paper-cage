@@ -69,7 +69,7 @@ def title_card():
     d = ImageDraw.Draw(im)
     txt(d, (110, 96), "案 卷      No.07 / 19", 15, SONG, MUTED, anchor="lm", tracking=4)
     d.line([110*S, 132*S, 1490*S, 132*S], fill=INK2, width=1)
-    txt(d, (800, 330), "第 七 夜", 112, KAI, INK, tracking=16)
+    txt(d, (800, 330), "纸 上 牢 笼", 96, KAI, INK, tracking=14)
     d.line([560*S, 420*S, 1040*S, 420*S], fill=(160, 143, 116), width=1)
     txt(d, (800, 492), "你是监狱长。七天，最多六条规矩，", 27, SONG, INK2, tracking=2)
     txt(d, (800, 545), "关住一个每天都在找漏洞的人。", 27, SONG, INK2, tracking=2)

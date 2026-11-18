@@ -23,7 +23,7 @@ API = "https://api-inference.modelscope.cn/v1/chat/completions"
 TOKEN = os.environ.get("MODELSCOPE_API_KEY", "").strip()
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-SYSTEM = """你是监狱题材小游戏《第七夜》的语言层。你只做两件事：
+SYSTEM = """你是监狱题材小游戏《纸上牢笼》的语言层。你只做两件事：
 1. 把玩家写的一句「规矩」翻译成可执行的判定字段；
 2. 把游戏引擎算出的漏洞清单，说成一句囚犯口吻的低语。
 你不做判定，不编造事实，不输出解释。只输出 JSON。"""
@@ -177,7 +177,7 @@ def _remark(payload):
     route = st.get("route") or "某条路"
     outcome = st.get("outcome") or "unknown"
     blocked = st.get("blocked") or ""
-    prompt = """这是第七夜之前的一夜。
+    prompt = """这是最后一夜之前的一夜。
 玩家（监狱长）写的规矩：%s
 囚犯今晚走的是：%s
 今晚的结果：%s
@@ -227,9 +227,9 @@ def npc(payload_json: str) -> str:
         return json.dumps({"ok": False, "error": str(e)[:120]}, ensure_ascii=False)
 
 
-demo = gr.Blocks(title="第七夜", js="() => { try { window.location.replace('/play'); } catch (e) {} }")
+demo = gr.Blocks(title="纸上牢笼", js="() => { try { window.location.replace('/play'); } catch (e) {} }")
 with demo:
-    gr.HTML("<div style='font:16px/1.8 serif;padding:32px'>正在载入 · 第七夜</div>")
+    gr.HTML("<div style='font:16px/1.8 serif;padding:32px'>正在载入 · 纸上牢笼</div>")
     _in = gr.Textbox(value="{}", visible=False)
     _out = gr.Textbox(value="", visible=False)
     _btn = gr.Button(visible=False)

@@ -1,0 +1,16 @@
+import { connect } from './browser.mjs';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p = await connect();
+await p.goto('https://modelscope.cn/active/AIstudio', 10000);
+const f = await p.attachFrame('mseo-ai-inf');
+const sid = f.sessionId;
+const ev = js => p.ev(js, sid);
+await ev('(()=>{const as=[...document.querySelectorAll("a,button,div")].filter(e=>(e.innerText||"").trim()==="作品提交");if(as.length)as[0].click();})()');
+await sleep(5000);
+const clicked=await ev('(()=>{const b=[...document.querySelectorAll("button")].find(x=>(x.innerText||"").trim()==="编辑");if(!b)return "noedit";b.click();return "ok";})()');
+console.log('EDIT', clicked);
+await sleep(4000);
+console.log('FORM', String(await ev('(()=>{const out=[];document.querySelectorAll("input,textarea,select").forEach(e=>{const r=e.getBoundingClientRect();out.push({tag:e.tagName,ph:e.placeholder||"",val:(e.value||"").slice(0,60),x:Math.round(r.x),y:Math.round(r.y),w:Math.round(r.width)});});return JSON.stringify(out);})()')));
+console.log('BTNS', String(await ev('(()=>{return [...document.querySelectorAll("button")].map(b=>((b.innerText||"").trim())).filter(Boolean).join("|");})()')));
+await p.shot('spa-edit.png');
+p.close();

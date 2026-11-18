@@ -20,7 +20,7 @@ const segs = [
   { type:'vid', path:B2, start:0, dur:9, speed:1.6, caption:'七天，最多六条规矩。没有人能全封住。' },
   { type:'vid', path:B2, start:20.9, dur:19.1, speed:4, caption:'他每天换一条缝。' },
   { type:'vid', path:B2, start:40, dur:32, speed:8, caption:'每一夜，路都更窄一点。' },
-  { type:'vid', path:B2, start:72, dur:8.7, speed:3, caption:'第七夜之后，一切交给判决书。' },
+  { type:'vid', path:B2, start:72, dur:8.7, speed:3, caption:'七夜之后，一切交给判决书。' },
   { type:'img', path:'C:/Users/lcj/Desktop/tap/six-rules/tools/chk-verdict.jpg', dur:5, caption:'判定不是 AI 写的：引擎算完七天，只留一句话。' },
   { type:'img', path:'C:/Users/lcj/Desktop/tap/six-rules/tools/card-end.jpg', dur:8 },
 ];

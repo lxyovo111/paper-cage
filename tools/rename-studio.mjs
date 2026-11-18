@@ -1,7 +1,7 @@
 // rename-studio.mjs — 把创空间中文名称改为《第七夜》，保存并回读验证
 import { attach } from './attach.mjs';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const NEW = process.argv[2] || '第七夜';
+const NEW = process.argv[2] || '纸上牢笼';
 const p = await attach('modelscope');
 const t = await p.send('Target.createTarget', { url: 'about:blank' });
 const n = await p.send('Target.attachToTarget', { targetId: t.targetId, flatten: true });
@@ -16,7 +16,7 @@ await sleep(7000);
 // 1) 设置中文名称
 console.log('set:', await ev(`(() => {
   const inputs = Array.from(document.querySelectorAll('input.antd5-input')).filter(e => !e.disabled);
-  const el = inputs.find(e => e.value === '六条规矩' || e.value === '第七夜') || inputs[1];
+  const el = inputs.find(e => e.value === '六条规矩' || e.value === '第七夜' || e.value === '纸上牢笼') || inputs[1];
   if (!el) return 'noinput';
   const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
   el.focus();

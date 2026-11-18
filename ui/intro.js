@@ -55,7 +55,7 @@ function seal(cx, cy, n, label, rot) {
 const LINES = [
   "你写一句人话，它被译成一条能执行的条件。",
   "他每晚只走一条缝；AI 替他挑，判定归引擎。",
-  "第七夜之后，是一张判决书。",
+  "七夜之后，是一张判决书。",
 ];
 
 export function renderIntro() {
@@ -72,7 +72,7 @@ export function renderIntro() {
   s += trail([[132, 906], [300, 906], [300, 946], [1300, 946], [1300, 906], [1468, 906]], 0.07);
   // 标题区
   s += T(800, 258, "二 〇 二 六 · 冬", { size: 13, fill: C.MUT2, tracking: 6, anchor: "middle" });
-  s += T(800, 440, "第 七 夜", { size: 168, tracking: 20, anchor: "middle" });
+  s += T(800, 440, "纸 上 牢 笼", { size: 152, tracking: 22, anchor: "middle" });
   s += H(650, 492, 950, 492, { opacity: 0.42, w: 1.2 });
   s += T(800, 566, "七天，最多六条规矩", { size: 38, anchor: "middle", tracking: 4 });
   s += T(800, 620, "关住一个每天夜里都在找漏洞的人", { size: 38, anchor: "middle", tracking: 2 });
@@ -96,7 +96,7 @@ export function renderIntroMobile() {
   // 空白处留一条淡路径，第 1030–1180 一带
   s += trail([[70, 1180], [250, 1180], [250, 1060], [520, 1060], [520, 980], [740, 980]], 0.07);
   s += T(400, 250, "二 〇 二 六 · 冬", { size: 17, fill: C.MUT2, tracking: 6, anchor: "middle" });
-  s += T(400, 410, "第 七 夜", { size: 138, tracking: 8, anchor: "middle" });
+  s += T(400, 410, "纸 上 牢 笼", { size: 106, tracking: 6, anchor: "middle" });
   s += H(270, 456, 530, 456, { opacity: 0.42, w: 1.2 });
   s += T(400, 534, "七天，最多六条规矩", { size: 34, anchor: "middle", tracking: 3 });
   s += T(400, 584, "关住一个每天夜里都在找漏洞的人", { size: 30, anchor: "middle", tracking: 1 });

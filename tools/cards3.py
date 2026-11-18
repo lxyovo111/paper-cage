@@ -110,7 +110,7 @@ def card2():
     txt(d, (540, 920), "「洗衣房的床单，夜里不许取走」", 32, KAI, INK)
     txt(d, (540, 970), "→  22:00–05:00 · 洗衣房 · 禁止取物  ·  拦得住", 17, SONG, WARM)
     txt(d, (540, 1092), "你写的是意思。执行的是判定条。", 22, KAI, RED, tracking=2)
-    txt(d, (540, 1306), "第七夜 · 魔搭创空间可玩", 19, SONG, MUTED, tracking=3)
+    txt(d, (540, 1306), "纸上牢笼 · 魔搭创空间可玩", 19, SONG, MUTED, tracking=3)
     save(im, "xhs-2.jpg")
 
 def card3():
@@ -130,7 +130,7 @@ def card3():
     txt(d, (540, 1060), "引擎算完七天，只留一句话。", 30, KAI, INK2, tracking=2)
     txt(d, (540, 1170), "AI 只负责：他今晚试哪条缝，以及他此刻的样子。", 18, SONG, MUTED, tracking=1)
     seal(im, 862, 1030, 132, "查 讫")
-    txt(d, (540, 1306), "第七夜 · 魔搭创空间可玩", 19, SONG, MUTED, tracking=3)
+    txt(d, (540, 1306), "纸上牢笼 · 魔搭创空间可玩", 19, SONG, MUTED, tracking=3)
     save(im, "xhs-3.jpg")
 
 card1()

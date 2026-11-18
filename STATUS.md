@@ -1,11 +1,11 @@
-# 《第七夜》· 交付状态（2026-11-17 20:34）
+# 《纸上牢笼》· 交付状态（2026-11-17 20:34）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
 - 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play
 - 演示视频（90 秒，含开/关 AI 对照）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （200 / video/mp4 / 5.5 MB）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
-  - 标题《第七夜》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
+  - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
 - 参赛报名：已审核通过（小红书方案 https://xhslink.cn/o/Afux7g4n5JK）
 - 作品提交：已提交，状态**待审核**（提交时间 2026/11/17 19:25:02；我的作品 = 1 个）
 

@@ -1,0 +1,16 @@
+import { connect } from './browser.mjs';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p = await connect();
+await p.goto('https://modelscope.cn/active/AIstudio', 10000);
+const f = await p.attachFrame('mseo-ai-inf');
+const sid = f.sessionId;
+const ev = js => p.ev(js, sid);
+await ev('(()=>{const as=[...document.querySelectorAll("a,button,div")].filter(e=>(e.innerText||"").trim()==="作品提交");if(as.length)as[0].click();})()');
+await sleep(5000);
+console.log('HTML', String(await ev('(()=>{const b=[...document.querySelectorAll("button")].find(x=>(x.innerText||"").trim()==="编辑");return b?b.outerHTML.slice(0,400):"none";})()')));
+const clicked=await ev('(()=>{const b=[...document.querySelectorAll("button")].find(x=>(x.innerText||"").trim()==="编辑");if(!b)return "noedit";const r=b.getBoundingClientRect();for(const t of ["mouseover","mousedown","mouseup","click"]) b.dispatchEvent(new MouseEvent(t,{bubbles:true,cancelable:true,view:window,clientX:r.x+r.width/2,clientY:r.y+r.height/2}));return "ok";})()');
+console.log('CLICK', clicked);
+await sleep(6000);
+console.log('URL', await ev('location.href'));
+console.log('TXT', String(await ev('document.body.innerText')).replace(/[\r\n]+/g,' | ').slice(0,500));
+p.close();

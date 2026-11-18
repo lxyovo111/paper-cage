@@ -62,7 +62,7 @@ for (const [tag, rel] of MODS) {
 
 const css = fs.readFileSync(path.join(root, 'styles.css'), 'utf8');
 const html = '<!doctype html>\n<html lang="zh-CN">\n<head>\n<meta charset="utf-8">\n' +
-  '<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>第七夜</title>\n' +
+  '<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>纸上牢笼</title>\n' +
   '<script src="//g.alicdn.com/code/lib/iframe-resizer/4.3.2/iframeResizer.contentWindow.min.js"><\/script>\n' +
   '<style>\n' + css + '\n</style>\n</head>\n<body>\n' +
   '<div id="desk"><div id="stage"><div id="screen"></div><div id="overlay"></div></div></div>\n' +

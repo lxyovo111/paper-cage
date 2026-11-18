@@ -1,0 +1,15 @@
+import { connect } from './browser.mjs';
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const p = await connect();
+await p.goto('https://modelscope.cn/active/AIstudio', 10000);
+const f = await p.attachFrame('mseo-ai-inf');
+console.log('FRAME', JSON.stringify(f));
+const sid = f.sessionId;
+const txt = async () => String(await p.ev('document.body.innerText', sid)).replace(/[\r\n]+/g,' | ');
+console.log('HOME', (await txt()).slice(0,300));
+const nav = await p.ev('(()=>{const as=[...document.querySelectorAll("a,button,div")].filter(e=>(e.innerText||"").trim()==="作品提交");return as.map(e=>e.tagName+":"+Math.round(e.getBoundingClientRect().x)+","+Math.round(e.getBoundingClientRect().y)).join("|");})()', sid);
+console.log('NAV', nav);
+const clicked = await p.ev('(()=>{const as=[...document.querySelectorAll("a,button,div")].filter(e=>(e.innerText||"").trim()==="作品提交");if(!as.length)return "none";as[0].click();return "ok";})()', sid);
+await sleep(6000);
+console.log('AFTER', (await txt()).slice(0,600));
+p.close();
