@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 const TOKEN_FILE = 'C:/Users/lcj/Desktop/tap/six-rules/tools/.review-token';
-const ID = '09b83cbe-4048-4694-9a47-888538b12981';
+const ID = 'ad9e646f-0e72-4387-bf92-e3ceddadb9b6';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const log = (s) => { const line = new Date().toISOString() + ' ' + s; console.log(line); try { fs.appendFileSync('C:/Users/lcj/Desktop/tap/six-rules/tools/review-watch.log', line + '\n'); } catch (_) {} };
 log('WATCH start id=' + ID);
