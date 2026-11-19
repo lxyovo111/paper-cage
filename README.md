@@ -7,9 +7,12 @@
 
 比赛：魔搭「AI+∞ 开发者创作大赛」第三期 · AI 造游戏（2026.11）
 
+> 命名说明：作品名统一为《纸上牢笼》（英文 Paper Cage）。创空间标识沿用 `six-rules`（试玩链接已公开、不可变更），源码仓库早前名为 `seventh-night`（已改名、旧链接自动跳转）；标题、文案与代码内名称一律用《纸上牢笼》，不再出现旧名。
+
 | 入口 | 地址 |
 | - | - |
 | 试玩（魔搭创空间） | https://modelscope.cn/studios/lxyovo/six-rules |
+| 开源仓库（Apache-2.0） | https://github.com/lxyovo111/paper-cage |
 | 游戏直出（无平台外壳） | https://lxyovo-six-rules.ms.show/play |
 | 90 秒演示视频 | https://lxyovo-six-rules.ms.show/static/demo-90.mp4 |
 | 创作手记 | https://modelscope.cn/posts/438502 |
