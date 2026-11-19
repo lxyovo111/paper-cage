@@ -1,8 +1,8 @@
-# 《纸上牢笼》· 交付状态（2026-11-19 13:26）
+# 《纸上牢笼》· 交付状态（2026-11-20 00:10）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-20 00:02 重新部署成功：200 / 128437 字节 / 含 report-live）
 - 演示视频（90 秒，含开/关 AI 对照）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （200 / video/mp4 / 5.5 MB）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
@@ -24,6 +24,14 @@
 - 开源仓库：https://github.com/lxyovo111/paper-cage （Apache-2.0；2026-11-19 由 seventh-night 改名，旧链接 301 跳转）
 - 试玩物料：`docs/试玩说明.md`（可直接转发，含 5 个反馈问题）
 - 人气奖物料：`docs/小红书-第二篇.md` + 配图 `tools/xhs-1.jpg` / `xhs-2.jpg` / `xhs-3.jpg`
+
+## 改名统一与重新部署（2026-11-19 22:10–2026-11-20 00:02）
+- 问题：页面标题《纸上牢笼》、app.py SYSTEM 提示词仍是《第七夜》、仓库名 six-rules、README 标题「六条规矩」四处名字打架。已统一为《纸上牢笼》：本地 app.py（SYSTEM 名 / 夜间 prompt / `gr.Blocks(title=…)` / 载入 HTML）、README 首行 `# 纸上牢笼 · Paper Cage`、GitHub 仓库改名 `lxyovo111/seventh-night` → `lxyovo111/paper-cage`（旧链接 301，commit 7c806e8）。创空间 slug `six-rules` 与已审核提交链接保持不变（改 slug 需删稿重提重审，风险大）。
+- 创空间「空间文件」里的 app.py/README 是改名前的旧副本（此前只重传了 index.html）→ 已重传，重克隆验证「第七夜」出现 0 次。
+- **部署连续失败 4 次的根因**：创空间仓库里没有 `ms_deploy.json`（15 个文件，缺这个），平台回落到新默认镜像 `(Recommended)ubuntu22.04-(cuda12.8.1)-py312-torch2.10.0-modelscope1.37.0`；该镜像在 EAS 阶段「image optimizing」失败，`/play` 返回 412 `function is failed state (failed to do image optimizing)`，运行日志恒为空，只有构建日志能看到 FROM。
+- **修复**：把 `ms_deploy.json` 补传进创空间仓库；再把服务器端部署设置（「调整部署设置 → JSON配置」）改成与之一致的小镜像 `ubuntu22.04-py311-torch2.3.1-modelscope1.31.0`（平台显示名 `ubuntu22.04-(cuda12.1.0)-py311-torch2.3.1-modelscope1.31.0`）+ `platform/2v-cpu-16g-mem`、密文变量 MODELSCOPE_API_KEY 填真实值（JSON 保存会把密文回写成占位符，必须重填）→ 重新部署：23:51:54 开始建镜像，23:57:50 转 Creating，**00:02:13 /play 200，部署成功**（状态 `Running`）。
+- 验证：`/play` 200 / 128437 字节 / 含 `<g id="report-live">` / 标题含「纸上牢笼」/ 无「第七夜」；`/healthz` `{"ok":true}`；`/gradio_api/call/npc` 通路正常（返回 event_id 与 SSE complete）。
+- **遗留（需要人处理）**：魔搭 API-Inference 现在对所有模型都返回 429 `insufficient balance`（账户免费额度/余额不足，今晚大量调用后出现），所以线上 AI 语言层降级走本地兜底（规则编译、挑路线、夜间独白都退回模板/规则）——游戏仍能玩完七天，但评审的「AI 能力」分需要 AI 真正在跑。待办：去魔搭控制台查/领 API-Inference 免费额度或绑定支付宝，或换别家 key（SiliconFlow / DeepSeek 等）。额度恢复后复跑 `node tools/_verify-live.mjs` 与一局真机对局。
 
 ## 待办 / 可选
 - 玩法/难度/夜戏已上线，桌面+手机真机夜戏验收通过；建议用户亲自再玩一局确认难度手感（尤其第 4 夜起的一夜两步）
