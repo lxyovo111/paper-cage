@@ -4,6 +4,13 @@
   --song:'Songti SC','SimSun','Noto Serif CJK SC',serif;
 }
 *{box-sizing:border-box}
+/* 首屏占位：脚本还没执行完时先给一张同色纸，避免白屏被误认为卡死 */
+#boot{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:radial-gradient(120% 90% at 50% 30%, #2a231b 0%, #171310 60%, #0d0b09 100%);
+  color:#d9c9a8;transition:opacity .45s ease;pointer-events:none}
+#boot.boot-done{opacity:0}
+#boot .boot-t{font-family:var(--kai);font-size:clamp(20px,4.2vw,34px);letter-spacing:.32em;color:#e8dcc0}
+#boot .boot-s{font-family:var(--song);font-size:clamp(11px,1.4vw,13px);letter-spacing:.18em;color:#8d7c63}
 html,body{margin:0;height:100%;overflow:hidden;background:#14110e}
 body{
   display:grid;place-items:center;

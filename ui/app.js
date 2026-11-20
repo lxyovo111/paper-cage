@@ -474,7 +474,7 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); return; }
+  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
@@ -482,7 +482,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') closeSheet();
   // 封面支持回车 / 空格开始
   if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) {
-    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame();
+    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900);
   }
 });
 // 竖屏 ↔ 横屏 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
@@ -496,6 +496,14 @@ window.addEventListener('resize', () => {
 document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
 // ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
 if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
-warm();   // 预热语言模型，别让第一条规矩撞上冷启动
+// 预热语言模型：挪到点「进入」之后（页面加载时发只是白占首屏带宽与并发），
+// 提前 900ms 起跑，等玩家写完第一条规矩时模型已经热了。
+function bootDone() {
+  const b = document.getElementById('boot');
+  if (!b) return;
+  b.classList.add('boot-done');
+  setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 600);
+}
+requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(bootDone, 120); }); });
 window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
 window.__audio = audio;

@@ -18,26 +18,33 @@ function el(key) {
   a.volume = 0;
   return a;
 }
+// 白天 BGM 在开局就用，夜里那条 433 KB 等第一次切夜里再加载，别和首屏抢带宽。
+function nightEl() {
+  if (!bg.night) bg.night = el('night');
+  return bg.night;
+}
 function ensure() {
-  if (!bg.day) { bg.day = el('day'); bg.night = el('night'); }
+  if (!bg.day) bg.day = el('day');
 }
 function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
 function fade() {
   if (bg.fade) { clearInterval(bg.fade); bg.fade = null; }
   if (!bg.day || muted) return;
+  if (bg.mode === 'night') nightEl();
   const t0 = now();
-  const from = { day: bg.day.volume, night: bg.night.volume };
+  const from = { day: bg.day.volume, night: bg.night ? bg.night.volume : 0 };
   const to = { day: bg.mode === 'day' ? VOL.day : 0, night: bg.mode === 'night' ? VOL.night : 0 };
   bg.fade = setInterval(function () {
     const k = Math.min(1, (now() - t0) / 900);
     bg.day.volume = from.day + (to.day - from.day) * k;
-    bg.night.volume = from.night + (to.night - from.night) * k;
+    if (bg.night) bg.night.volume = from.night + (to.night - from.night) * k;
     if (k >= 1) { clearInterval(bg.fade); bg.fade = null; }
   }, 40);
 }
 function playBg() {
   ensure();
   [bg.day, bg.night].forEach(function (a) {
+    if (!a) return;
     const p = a.play();
     if (p && p.catch) p.catch(function () {});
   });

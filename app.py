@@ -4,14 +4,16 @@
 #      由 Blocks 的 js 参数在页面加载后跳过去；直接把 index.html 顶到 / 是没用的（平台会劫持 /）。
 #   2) 同一个 Gradio 暴露 /gradio_api/call/npc 给前端调语言模型。
 # 判定全在 JS 规则引擎里；LLM 只做「编译规矩」和「挑一条漏洞」，超时/失败自动降级。
+import gzip
+import hashlib
 import json
 import os
 import threading
 
 import gradio as gr
 import requests
-from fastapi import FastAPI
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 MODEL = os.environ.get("NPC_MODEL", "Qwen/Qwen3.8-27B")
@@ -303,14 +305,51 @@ def _health():
     return {"ok": True}
 
 
-@app.get("/play")
-def _play():
-    """游戏本体：自包含静态页。放在 /play，因为它必须在真正的 HTML 文档里跑 ——
-    创空间的外壳页永远在 / 上渲染 Gradio，不能直接把 index.html 顶到 /。"""
+_PLAY = {"mtime": None, "raw": b"", "gz": b"", "etag": ""}
+
+
+def _play_page():
     for p in (os.path.join(HERE, "index.html"), os.path.join(HERE, "dist", "index.html")):
         if os.path.exists(p):
-            return FileResponse(p)
-    return JSONResponse({"error": "index.html missing"}, status_code=500)
+            return p
+    return None
+
+
+@app.get("/play")
+def _play(request: Request):
+    """游戏本体：自包含静态页。放在 /play，因为它必须在真正的 HTML 文档里跑 ——
+    创空间的外壳页永远在 / 上渲染 Gradio，不能直接把 index.html 顶到 /。
+
+    首屏传输优化：内联页 165 KB，经平台代理时不会被压缩，4G 下要多等 2–3 秒。
+    这里预压一份 gzip（约 45 KB）常驻内存，按 mtime 自动失效；带 ETag 支持 304。
+    """
+    p = _play_page()
+    if not p:
+        return JSONResponse({"error": "index.html missing"}, status_code=500)
+    mtime = os.path.getmtime(p)
+    if _PLAY["mtime"] != mtime:
+        with open(p, "rb") as f:
+            raw = f.read()
+        _PLAY["raw"] = raw
+        _PLAY["gz"] = gzip.compress(raw, 6)
+        _PLAY["etag"] = 'W/"' + hashlib.sha1(raw).hexdigest()[:24] + '"'
+        _PLAY["mtime"] = mtime
+    etag = _PLAY["etag"]
+    headers = {"ETag": etag, "Cache-Control": "no-cache", "Vary": "Accept-Encoding"}
+    if request.headers.get("if-none-match") == etag:
+        return Response(status_code=304, headers=headers)
+    if "gzip" in (request.headers.get("accept-encoding") or "").lower():
+        headers["Content-Encoding"] = "gzip"
+        return Response(content=_PLAY["gz"], media_type="text/html; charset=utf-8", headers=headers)
+    return Response(content=_PLAY["raw"], media_type="text/html; charset=utf-8", headers=headers)
+
+
+@app.middleware("http")
+async def _static_cache(request: Request, call_next):
+    resp = await call_next(request)
+    if request.url.path.startswith("/static/"):
+        resp.headers.setdefault("Cache-Control", "public, max-age=86400")
+    return resp
 
 
 app.mount("/static", StaticFiles(directory=HERE), name="static")

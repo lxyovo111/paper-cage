@@ -12,6 +12,13 @@
   --song:'Songti SC','SimSun','Noto Serif CJK SC',serif;
 }
 *{box-sizing:border-box}
+/* 首屏占位：脚本还没执行完时先给一张同色纸，避免白屏被误认为卡死 */
+#boot{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;
+  background:radial-gradient(120% 90% at 50% 30%, #2a231b 0%, #171310 60%, #0d0b09 100%);
+  color:#d9c9a8;transition:opacity .45s ease;pointer-events:none}
+#boot.boot-done{opacity:0}
+#boot .boot-t{font-family:var(--kai);font-size:clamp(20px,4.2vw,34px);letter-spacing:.32em;color:#e8dcc0}
+#boot .boot-s{font-family:var(--song);font-size:clamp(11px,1.4vw,13px);letter-spacing:.18em;color:#8d7c63}
 html,body{margin:0;height:100%;overflow:hidden;background:#14110e}
 body{
   display:grid;place-items:center;
@@ -458,26 +465,33 @@ function el(key) {
   a.volume = 0;
   return a;
 }
+// 白天 BGM 在开局就用，夜里那条 433 KB 等第一次切夜里再加载，别和首屏抢带宽。
+function nightEl() {
+  if (!bg.night) bg.night = el('night');
+  return bg.night;
+}
 function ensure() {
-  if (!bg.day) { bg.day = el('day'); bg.night = el('night'); }
+  if (!bg.day) bg.day = el('day');
 }
 function now() { return typeof performance !== 'undefined' ? performance.now() : Date.now(); }
 function fade() {
   if (bg.fade) { clearInterval(bg.fade); bg.fade = null; }
   if (!bg.day || muted) return;
+  if (bg.mode === 'night') nightEl();
   const t0 = now();
-  const from = { day: bg.day.volume, night: bg.night.volume };
+  const from = { day: bg.day.volume, night: bg.night ? bg.night.volume : 0 };
   const to = { day: bg.mode === 'day' ? VOL.day : 0, night: bg.mode === 'night' ? VOL.night : 0 };
   bg.fade = setInterval(function () {
     const k = Math.min(1, (now() - t0) / 900);
     bg.day.volume = from.day + (to.day - from.day) * k;
-    bg.night.volume = from.night + (to.night - from.night) * k;
+    if (bg.night) bg.night.volume = from.night + (to.night - from.night) * k;
     if (k >= 1) { clearInterval(bg.fade); bg.fade = null; }
   }, 40);
 }
 function playBg() {
   ensure();
   [bg.day, bg.night].forEach(function (a) {
+    if (!a) return;
     const p = a.play();
     if (p && p.catch) p.catch(function () {});
   });
@@ -3123,7 +3137,7 @@ document.addEventListener('click', (ev) => {
   const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); return; }
+  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
@@ -3131,7 +3145,7 @@ document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') closeSheet();
   // 封面支持回车 / 空格开始
   if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) {
-    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame();
+    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900);
   }
 });
 // 竖屏 ↔ 横屏 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
@@ -3145,7 +3159,15 @@ window.addEventListener('resize', () => {
 document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
 // ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
 if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
-warm();   // 预热语言模型，别让第一条规矩撞上冷启动
+// 预热语言模型：挪到点「进入」之后（页面加载时发只是白占首屏带宽与并发），
+// 提前 900ms 起跑，等玩家写完第一条规矩时模型已经热了。
+function bootDone() {
+  const b = document.getElementById('boot');
+  if (!b) return;
+  b.classList.add('boot-done');
+  setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 600);
+}
+requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(bootDone, 120); }); });
 window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
 window.__audio = audio;
 M["app"] = {};

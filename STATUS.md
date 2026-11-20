@@ -1,8 +1,8 @@
-# 《纸上牢笼》· 交付状态（2026-11-20 21:45）
+# 《纸上牢笼》· 交付状态（2026-11-21 00:45）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-20 21:33 重新部署成功：200 / 150298 字符 / 含 report-live + 手机横屏版式；内容与本机 dist/index.html 逐字符一致）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 00:39 重新部署成功：200 / 166,994 B（gzip 传输 51,487 B）/ 含 report-live + 手机横屏版式 + 首屏占位；内容与本机 dist/index.html 逐字符一致）
 - 演示视频（90 秒，含开/关 AI 对照）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （200 / video/mp4 / 5.5 MB）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
@@ -10,8 +10,27 @@
 - 作品提交：旧作品「第七夜」因平台锁定作品名无法编辑，2026/11/18 12:41:11 删除后以《纸上牢笼》重新提交，2026-11-18 约 15:30 审核通过。2026-11-19 12:25 再次删除并重新提交，简介换成第三版「我把 AI 关进监狱，第一晚他就摸到了门。……」（创空间描述与手记简介同步为该版）→ 新作品 id `ad9e646f-0e72-4387-bf92-e3ceddadb9b6`，提交时间 2026/11/19 12:22:32，**2026-11-19 13:11:31 审核通过**（`review_result=passed`、`is_public=1`、`reviewed_at=1795065091`）；监听脚本 `tools/review-watch.mjs`（日志 `tools/review-watch.log` 末行 `RESULT passed`）。旧提交数据备份 `tools/submission-backup.json`。审核通过截图 `tools/sub-approved.png`（赛事首页横幅「审核通过，去提交作品」）
 - 作品广场：**已恢复可见**（`/api/works` 第 1 页即见），卡片名「纸上牢笼」、简介为第三版、分类「Gradio 应用」、封面为案卷封面；当前广场共 148 个作品，我们创空间 visits=767 / stars=0 / likes=0 / hot_score=76.7。已通过的提交信息锁定（平台规则：审核通过后改简介需删除重提，慎用）
 
+## 首屏加速（2026-11-21 00:15–00:40，已上线）
+
+**为什么慢**（2026-11-21 00:12 桌面快网、禁用缓存实测）：作品页 `https://modelscope.cn/studios/lxyovo/six-rules` 自身 JS 总量 12.4 MB（umi.js 4.1 MB + 异步块 1.9 MB + 107 个 js），iframe 到 4.55s 才出现；随后平台注入 Gradio 外壳页（alicdn 前端 + iframe-resizer/polyfills），我们的 Blocks `js` 才 `location.replace("/play")`；我们自己的 `/play` 当时 165,643 B **无压缩、无缓存头**，服务端 TTFB 0.9–1.2s（`/healthz` 空响应也 0.55s = 平台代理固定开销）。从点开到看见封面 ≈5.0s，其中 ~4.5s 在平台侧。
+
+**改了什么**
+1. `/play` 开 gzip + 弱 ETag + `Cache-Control: no-cache`（`app.py` 新增 `_play_page()`：按 mtime 预压 `gzip.compress(raw, 6)`、`sha1[:24]` 生成 `W/"..."`；`if-none-match` 命中回 304；`Vary: Accept-Encoding`）。166,994 → **51,487 B（31.4%）**。
+2. `/static/` 前缀加 `Cache-Control: public, max-age=86400`（middleware `_static_cache`），BGM/音效/视频二次访问不再回源。
+3. 首屏占位 `#boot`（`index.html` + `styles.css`）：「纸 上 牢 笼 / 正在打开案卷…」深色底，脚本就绪后 `bootDone()` 双层 rAF 淡出并移除节点，消灭解析期白屏。
+4. `warm()` 从模块加载挪到点「进入」后 900ms（`ui/app.js`）：打开页面不再立刻打一次 LLM。
+5. 夜间 BGM 懒加载（`ui/audio.js`）：`ensure()` 只建白天 BGM，`bg.mode==="night"` 时才建夜间 BGM，首开少下 432,945 B。
+
+**线上验证（部署 00:31:59 CreatingBuildingImage → 00:38:25 Creating → 00:39:06 Running）**
+- `/play` 200 / `Content-Encoding: gzip` / `Content-Length: 51,487` / `ETag: W/"2046166c27a47fdbb8e28d4a"` / `Cache-Control: no-cache`，TTFB 721ms；带 `if-none-match` → **304（0 字节）**。
+- `/static/audio-day.mp3` Range → **206** + `public, max-age=86400`；`/healthz` 200。
+- 标记：report-live / isLandscapeView / boot-done / `<title>纸上牢笼</title>` 全在；iframe 内 `/play` 的 `encodedBodySize` 由 165,643 → **51,487**。
+- 回归：`dist-test.mjs` final settle（day7 / rules6 / nights6 / errors=none）；`mtest2.mjs` 竖屏 settle + LINES 4 + 无错；线上 AI compile 冒烟 `{"ok":true, ...}`。
+
+**边界（不可控）**：平台作品页 12.4 MB JS、Gradio 外壳启动、免费 CPU 按需实例冷启动都在平台侧；桌面快网复测 cover 5,156ms（平台页占大头），gzip 的收益主要体现在 4G/慢网（少下 115 KB）与二次打开（`/static` 304/长缓存）。直连 `ms.show/play` 仍 302 回平台页，不能当快速入口。
+
 ## 已交付
-- 游戏本体：单文件自包含 dist/index.html（144,538 字节，约 141 KB），确定性规则引擎 + SVG 全屏 UI + 夜戏动画
+- 游戏本体：单文件自包含 dist/index.html（2026-11-21 00:39 上线版 166,994 字节，约 163 KB；2026-11-20 竖屏/横屏双版式 + 首屏加速），确定性规则引擎 + SVG 全屏 UI + 夜戏动画
 - AI 语言层：魔搭 API Inference（Qwen/Qwen3.8-27B，关思维链），三处用途 = 编译规矩 / 在引擎漏洞清单里挑路线 / 夜间一句独白；全部有本地兜底，界面不阻塞
 - 演示视频：72.87s / 1600×1000 / 5.84 MB，结构 = 标题卡 → 写规矩+AI 校准 → 第一夜 → 第二夜被规矩堵住 → A/B 对照卡 → 快进七天 → 判决书 → 尾卡
 - 创作手记：六节官方模板 + 第 7 节「开源与对照实验」+ 第 8 节「11-20 更新：AI 的记忆与状态」；公开页正文约 4.6 千字符，含试玩/视频/工具实测数据（0.7–2.7s vs 25s+）；2026-11-18 已改名为《纸上牢笼》并修复一次正文重复事故（现正文单份、8 节齐全）
