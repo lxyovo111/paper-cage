@@ -1,0 +1,8 @@
+#!/bin/sh
+# pre-commit：密钥闸门（安装：git config core.hooksPath .githooks）
+cd "$(git rev-parse --show-toplevel)" || exit 0
+if command -v node >/dev/null 2>&1; then
+  node tools/secret-scan.mjs --staged || exit 1
+else
+  echo "[pre-commit] 找不到 node，跳过密钥扫描（请手动检查 tool/.ms-key 与 Bearer 字面量）" >&2
+fi

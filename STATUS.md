@@ -53,7 +53,7 @@
 - **现象**：账号魔粒余额归零；2026-11-20 当日消耗 3250.5（旗舰 3212 = 1606 次 ×2、标准 38、轻量 0.5），而 11-19 旗舰 122 次、11-18 4 次、11-17 标准 243 次。
 - **定位结论**：游戏模型 Qwen/Qwen3.8-27B 属**标准档（1 魔粒/次）**，当日标准档只有 38 次（= 我们自己的冒烟测试），**爆耗不是游戏本身**。真正原因：API Key 明文写在 6 个公开 GitHub 脚本里（2026-11-17 20:03 提交 7286d45 起公开，含 tools/models.mjs、think-test.mjs、compile-prompt-test.mjs、nex-test.mjs、remark-test.mjs、think-off-test.mjs），被外部拿去跑旗舰模型（消耗曲线 8→4→122→1606 次陡增吻合）。次要嫌疑 birthday-island（公开、35B-A3B），但访问量（92）撑不起 1606 次。
 - **止血**：上述 6 个脚本移除硬编码 key，改为 process.env.MODELSCOPE_API_KEY || readFileSync(new URL(".ms-key", import.meta.url))；README 增加「本地调试脚本的 API Key」说明；commit **98c17b3** 已 push。HEAD 已无 key（git 历史仍保留旧 key，已作废）。
-- **轮换**：新建细粒度令牌 paper-cage-2026（唯一 scope = api-inference，长期有效），新值写入 tools/.ms-key；旧令牌 lxy（ms-3c35db99-…）**已删除**，直连验证旧 key → 401 Authentication failed。
+- **轮换**：新建细粒度令牌 paper-cage-2026（唯一 scope = api-inference，长期有效），新值写入 tools/.ms-key；旧令牌 lxy（已吊销，值不留档）**已删除**，直连验证旧 key → 401 Authentication failed。
 - **创空间密文变量更新（重要经验）**：JSON 配置里改 secret **不会被识别为变更**（保存后抽屉显示「部署设置 0 处变更」，部署白跑）；必须走 **可视化配置** → 密文变量行内铅笔图标 → 填新值 → 保存 → 弹「是否立即重新部署」→ 重新部署 → 抽屉显示「部署设置 1 处变更 / 密文变量」→ 确认部署。本次 DeployedTime 18:52:17，18:53:31 Running。
 - **验证**：部署后调用线上 /gradio_api/call/npc compile → 返回 429 insufficient balance（key 有效、余额为 0；若仍持有旧 key 应返回 401）→ **新 key 已生效**。 /play 200 / 130012 字符 / 含 report-live。
 - **影响**：余额为 0 时游戏仍可玩（本地规则兜底），但 AI 层（编译/挑路/夜间独白）全部降级为模板 → 评审期需要魔粒。每日可得：登录 200 + 绑定阿里云 50 ≈ 250；创空间/文章影响力各 +50（浏览≥100 且喜欢≥5）。

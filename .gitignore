@@ -1,3 +1,13 @@
+# ---- 凭证：永不入仓 ----
+.ms-key
+.ms-key.*
+tools/.ms-key*
+.review-token
+.env
+.env.*
+*.pem
+*.p12
+
 # ---- 本地运行产物 / 缓存 ----
 __pycache__/
 *.pyc
