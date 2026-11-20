@@ -17,6 +17,11 @@
 | 90 秒演示视频 | https://lxyovo-six-rules.ms.show/static/demo-90.mp4 |
 | 创作手记 | https://modelscope.cn/posts/438502 |
 
+
+## 本地调试脚本的 API Key
+
+`tools/*.mjs` 里的探针脚本不硬编码任何密钥：运行时从环境变量 `MODELSCOPE_API_KEY` 读取，本地调试则放在 `tools/.ms-key`（已在 `.gitignore` 中）。
+
 ## 评审速览（三分钟版）
 
 - **先玩一局**：点红章进入 → 写一条规矩（AI 会把它译成判定条）→ 按右下角「入夜」。重点看**第二天早上巡查报告里多出来的那一行**：`他挑这条路，因为：……`。

@@ -1,6 +1,6 @@
 // think-off-test.mjs — 关闭思维链后，三类任务的延迟与质量
 import { readFileSync } from 'node:fs';
-const TOKEN = 'ms-3c35db99-02f7-4078-aa15-4be73ff996ef';
+const TOKEN = process.env.MODELSCOPE_API_KEY || readFileSync(new URL('.ms-key', import.meta.url), 'utf8').trim();
 const API = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const MODEL = 'Qwen/Qwen3.8-27B';
 const EXTRA = { chat_template_kwargs: { enable_thinking: false } };

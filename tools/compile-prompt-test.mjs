@@ -1,4 +1,5 @@
-const TOKEN = 'ms-3c35db99-02f7-4078-aa15-4be73ff996ef';
+import { readFileSync } from 'node:fs';
+const TOKEN = process.env.MODELSCOPE_API_KEY || readFileSync(new URL('.ms-key', import.meta.url), 'utf8').trim();
 const API = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const MODEL = 'Qwen/Qwen3.8-27B';
 const SYS = '你是监狱题材小游戏《六条规矩》的语言层。你只做两件事：1. 把玩家写的一句「规矩」翻译成可执行的判定字段；2. 把游戏引擎算出的漏洞清单，说成一句囚犯口吻的低语。你不做判定，不编造事实，不输出解释。只输出 JSON。';

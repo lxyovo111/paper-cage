@@ -1,5 +1,6 @@
 // think-test.mjs — 试几种关掉 reasoning 的参数，找最快能出 JSON 的组合
-const KEY = 'ms-3c35db99-02f7-4078-aa15-4be73ff996ef';
+import { readFileSync } from 'node:fs';
+const KEY = process.env.MODELSCOPE_API_KEY || readFileSync(new URL('.ms-key', import.meta.url), 'utf8').trim();
 const API = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const SYS = '你是规则编译器，只输出 JSON，不解释。';
 const USR = '把「医务室的窗，任何时候都不许碰」翻译成 JSON: {"lang":{"window":{"from":0,"to":1439},"zones":["medical"],"actions":["TAKE"],"item":"iron"}}。只输出 JSON。';

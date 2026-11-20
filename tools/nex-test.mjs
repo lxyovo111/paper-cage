@@ -1,4 +1,5 @@
-const TOKEN = 'ms-3c35db99-02f7-4078-aa15-4be73ff996ef';
+import { readFileSync } from 'node:fs';
+const TOKEN = process.env.MODELSCOPE_API_KEY || readFileSync(new URL('.ms-key', import.meta.url), 'utf8').trim();
 const API = 'https://api-inference.modelscope.cn/v1/chat/completions';
 const MODEL = 'nex-agi/Nex-N2.5-mini';
 async function chat(messages, max_tokens, temperature) {
