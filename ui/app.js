@@ -135,6 +135,7 @@ function dayBriefing() {
     if (last.outcome === 'idle' && !mv) lines.push({ t:'昨夜', text: out });
     else if (mv) { lines.push({ t:'昨夜', text: mv.text }); if (act) lines.push({ t:'', text: act.text }); }
     else lines.push({ t:'昨夜', text: out });
+    if (last.reason) lines.push({ t:'', text:'他挑这条路，因为：' + last.reason });
   }
   if (d === 1) lines = [
     { t:'档案', text:g.habit ? g.habit.line : '' },
@@ -317,6 +318,11 @@ async function runNight() {
   }
 
   const res = E.simulateNight(g, { routeId: actual });
+  // AI 挑路时给的那句理由：记进这一夜。第二天早上的巡查报告会写「他挑这条路，因为……」——
+  // 记忆不是旁白，是决策输入；关掉 AI 这一行就不存在，正是对照组的差别。
+  const reasonTxt = (pick && pick.reason) || '';
+  const nightRec = g.nights[g.nights.length - 1];
+  if (nightRec && reasonTxt) nightRec.reason = reasonTxt;
   // AI 只写「他今晚的样子」这一句。判定、路线、结局全在引擎里，AI 没有权限改任何数值。
   // 与逐条打印并行：打印完它刚好回来，不额外等；关掉 AI 或超时就用模板句。
   const blk = res.events.find((e) => e.kind === 'block');

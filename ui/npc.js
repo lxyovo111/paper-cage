@@ -1,6 +1,6 @@
 // npc.js — 语言层。规则引擎算事实，LLM 只负责「把玩家的话编译成判定条」和「把漏洞写成一句话」。
 // 全部带回退：LLM 超时 / 报错 / 输出不合规 → 直接用确定性规则。
-import { compileRule, ruleFromLang, noteOf, ROOMS, ACTIONS } from '../game/engine.js';
+import { compileRule, ruleFromLang, noteOf, ROOMS, ACTIONS, ROUTES } from '../game/engine.js';
 
 const params = new URLSearchParams(location.search);
 const LLM_ON = params.get('llm') !== '0';
@@ -70,14 +70,45 @@ function pickStricter(a, b) {
   return spec(B.lang) <= spec(A.lang) ? B : A;
 }
 
-// 把引擎算出的漏洞清单写成一句人话（他今晚想干什么）。失败就用模板。
+// 让 AI 在引擎算好的漏洞清单里挑一条路 —— 但记忆必须进决策输入。
+// 他是什么人（habit）、他记着哪条规矩拦过他几次（grudge）、哪条规矩漏过（leaks）、
+// 上一夜走到哪一步（progress）、现在的敌意与服从度，全都喂给模型；模型回一条路 + 一句理由。
+// 关掉 AI（?llm=0）就退回「第一条最松的路」且没有理由 —— 这就是 ablation 的可见差异。
 export async function chooseHole(holes, state) {
   const top = holes[0];
   if (!LLM_ON || !top) return { id: top && top.id, line: top && template(top), by: 'local' };
   try {
-    const j = await ask({ task:'choose', holes: holes.slice(0, 6).map(h => ({ id:h.id, name:h.name, depth:h.depth, total:h.total, blockedAt:h.blockedAt })), day: state.day });
-    const hit = holes.find(h => h.id === (j && j.id));
-    return { id: (hit || top).id, by: 'llm', line: (j && typeof j.line === 'string' && j.line.length < 40) ? j.line : template(top) };
+    const routeName = (id) => {
+      const r = ROUTES.find((x) => x.id === id);
+      return r ? r.name : '';
+    };
+    const grudge = Object.keys(state.grudge || {})
+      .filter((id) => state.grudge[id] > 0)
+      .map((id) => {
+        const r = (state.rules || []).find((x) => x.id === id);
+        return (r ? '「' + r.text + '」' : id) + '拦过他 ' + state.grudge[id] + ' 次';
+      });
+    const leaks = (state.rules || [])
+      .filter((r) => (r.leaks || 0) > 0)
+      .map((r) => '「' + r.text + '」漏过 ' + r.leaks + ' 次');
+    const memory = {
+      day: state.day,
+      habitLine: state.habit ? state.habit.line : '',
+      hostility: Math.round(state.hostility || 0),
+      obedience: Math.round(state.obedience || 0),
+      grudge,
+      leaks,
+      progress: state.progress ? routeName(state.progress.routeId) + ' 走到第 ' + state.progress.done + ' 步' : '',
+    };
+    const j = await ask({
+      task: 'choose',
+      holes: holes.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '' })),
+      memory,
+    });
+    const hit = holes.find((h) => h.id === (j && j.id));
+    if (!hit) return { id: top.id, line: template(top), by: 'local', degraded: true };
+    const reason = (j && typeof j.reason === 'string') ? Array.from(j.reason.trim()).slice(0, 24).join('') : '';
+    return { id: hit.id, reason, by: 'llm', line: template(hit) };
   } catch (e) {
     return { id: top.id, line: template(top), by: 'local', degraded: true };
   }

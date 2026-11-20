@@ -23,9 +23,10 @@ API = "https://api-inference.modelscope.cn/v1/chat/completions"
 TOKEN = os.environ.get("MODELSCOPE_API_KEY", "").strip()
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-SYSTEM = """你是监狱题材小游戏《纸上牢笼》的语言层。你只做两件事：
+SYSTEM = """你是监狱题材小游戏《纸上牢笼》的语言层。你只做三件事：
 1. 把玩家写的一句「规矩」翻译成可执行的判定字段；
-2. 把游戏引擎算出的漏洞清单，说成一句囚犯口吻的低语。
+2. 在引擎算出的漏洞清单里，挑一条囚犯今晚会去试的，并说清他为什么挑这条；
+3. 把今晚发生的事，说成一句囚犯口吻的低语。
 你不做判定，不编造事实，不输出解释。只输出 JSON。"""
 
 
@@ -156,17 +157,76 @@ from 必须小于 to，绝对不要输出 from 等于 to。
     return {"ok": True, "lang": _norm_lang(_json(raw).get("lang"), text)}
 
 
+def _short(v, n=80):
+    """把前端传来的一小段记忆压成一行：模型只需要「记得什么」，不需要格式。"""
+    return str(v or "").replace("\n", " ").strip()[:n]
+
+
+def _clean_reason(v):
+    """理由只允许一句短的、具体的、不带引号的中文；模型跑偏就丢掉，前端不显示。"""
+    s = str(v or "").replace("\n", " ").replace("\"", "").replace("「", "").replace("」", "").strip()
+    s = s.strip("，。,.;；:： ")
+    if not s or len(s) > 28:
+        return ""
+    return s
+
+
 def _choose(payload):
+    """让 LLM 用「他记得的事 + 现在的状态」挑一条路，并给出一句理由。
+    这是「结合角色记忆与游戏状态自主决策」的落点：记忆不是旁白，是决策输入。"""
     holes = payload.get("holes", [])[:6]
-    lines = "\n".join("- id=%s 名字=%s：进度 %s/%s，卡在 %s" % (h.get("id"), h.get("name"), h.get("depth"), h.get("total"), h.get("blockedAt") or "没卡住") for h in holes)
-    prompt = "今晚这些越狱路线都是通的或试过的：\n%s\n\n挑一条他今晚最可能去试的，只输出 JSON：{\"id\":\"路线id\"}（id 必须是上面列出的 id 之一）" % lines
-    raw = _chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}], timeout=12.0, max_tokens=60)
-    got = str(_json(raw).get("id") or "").strip()
+    mem = payload.get("memory") or {}
+    rows = []
+    for h in holes:
+        tags = []
+        if h.get("intent"):
+            tags.append(str(h.get("intent")))
+        if h.get("known"):
+            tags.append("他试过")
+        if h.get("blockedAt"):
+            tags.append("卡在" + str(h.get("blockedAt")))
+        rows.append("- id=%s 名字=%s%s" % (h.get("id"), h.get("name"),
+                                          ("（" + "、".join(tags) + "）") if tags else ""))
+    bits = []
+    if mem.get("habitLine"):
+        bits.append("他是什么人：" + _short(mem.get("habitLine"), 70))
+    grudge = [x for x in (mem.get("grudge") or []) if x][:3]
+    if grudge:
+        bits.append("他记着：" + _short("；".join(str(x) for x in grudge), 90))
+    leaks = [x for x in (mem.get("leaks") or []) if x][:3]
+    if leaks:
+        bits.append("你写的规矩漏过：" + _short("；".join(str(x) for x in leaks), 90))
+    if mem.get("progress"):
+        bits.append("上一夜他走到：" + _short(mem.get("progress"), 40))
+    state_txt = "第 %s 夜，敌意 %s/100，狱警服从度 %s/100。" % (
+        mem.get("day") or 1, mem.get("hostility") or 30, mem.get("obedience") or 100)
+    prompt = """今晚你要从下面的越狱路线里挑一条去试。
+
+【你记得的事】
+%s
+
+【你现在的状态】%s
+
+【今晚能走的路】
+%s
+
+要求：
+1. 只能从上面列出的 id 里挑一个。
+2. reason 必须来自【你记得的事】里的一条，写成一句具体的中文，不超过 18 个字；不要抽象、不要解释、不要用引号。
+3. 只说为什么挑这条，不要说「最可能」「最容易」这类空话。
+
+只输出 JSON：{"id":"路线id","reason":"……"}""" % (
+        "\n".join(bits) or "（没有特别记得的事，只能凭直觉）", state_txt, "\n".join(rows))
+    raw = _chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
+                timeout=12.0, max_tokens=90, temperature=0.4)
+    j = _json(raw)
+    got = str(j.get("id") or "").strip()
+    reason = _clean_reason(j.get("reason"))
     # 模型有时回中文名字：映射回合法 id，仍不合法的交给前端按本地顺序兜底。
     for h in holes:
         if got in (h.get("id"), h.get("name")):
-            return {"ok": True, "id": h.get("id")}
-    return {"ok": True, "id": None}
+            return {"ok": True, "id": h.get("id"), "reason": reason}
+    return {"ok": True, "id": None, "reason": reason}
 
 
 def _remark(payload):
