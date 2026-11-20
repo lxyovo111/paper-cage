@@ -222,7 +222,7 @@ function reportBlock(st) {
   }
   // 夜里逐条打字：坐标沿用桌面版（x=252/306, y 从 792 起），由 data-cfg 折算到手机版式
   return '<g id="report">' + g +
-    '<g id="report-live" data-cfg=\'{"x1":36,"x2":116,"y0":1476,"k":1.55,"fs":25,"cols":24}\'></g>' +
+    '<g id="report-live" data-cfg=\'{"x1":36,"x2":116,"y0":1476,"k":1.55,"fs":25,"cols":24,"pitch":30,"pitchCompact":20,"maxY":906,"maxYCompact":892}\'></g>' +
     '</g>';
 }
 

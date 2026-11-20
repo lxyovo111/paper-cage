@@ -85,6 +85,30 @@ export function renderIntro() {
   return s + "</svg>";
 }
 
+export function renderIntroLandscape() {
+  let s = `<svg class="intro" viewBox="0 0 1180 546" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
+  s += buildDefs();
+  s += buildPaper(1180, 546);
+  s += T(64, 30, "案  卷", { size: 12, tracking: 2 });
+  s += T(138, 30, "No.07 / 19", { size: 12, kai: false, tracking: 2, fill: C.INK2 });
+  s += T(64, 50, "内部资料 · 尚未结案", { size: 10.5, fill: C.MUTED, tracking: 1 });
+  s += T(1154, 30, "魔搭创空间 · AI 造游戏", { size: 9.5, fill: C.MUT2, tracking: 1, anchor: "end" });
+  s += H(26, 60, 1154, 60, { opacity: 0.4 });
+  s += trail([[70, 470], [300, 470], [300, 492], [880, 492], [880, 470], [1110, 470]], 0.07);
+  s += T(590, 96, "二 〇 二 六 · 冬", { size: 11, fill: C.MUT2, tracking: 5, anchor: "middle" });
+  s += T(590, 214, "纸 上 牢 笼", { size: 92, tracking: 14, anchor: "middle" });
+  s += H(455, 246, 725, 246, { opacity: 0.42, w: 1.2 });
+  s += T(590, 290, "七天，最多六条规矩", { size: 26, anchor: "middle", tracking: 3 });
+  s += T(590, 322, "关住一个每天夜里都在找漏洞的人", { size: 24, anchor: "middle", tracking: 1 });
+  LINES.forEach(function (t, i) {
+    s += T(590, 356 + i * 22, t, { size: 13.5, fill: C.MUTED, anchor: "middle", tracking: 1 });
+  });
+  s += seal(590, 476, 104, "进入");
+  s += T(700, 470, "点击红章开始", { size: 13, fill: C.MUT2, tracking: 2 });
+  s += T(700, 492, "一局约 8 分钟 · 建议横屏", { size: 10.5, fill: C.MUT2, tracking: 1 });
+  return s + "</svg>";
+}
+
 export function renderIntroMobile() {
   let s = `<svg class="intro" viewBox="0 0 800 1840" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();

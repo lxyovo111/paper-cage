@@ -12,6 +12,7 @@ const MODS = [
   ['engine', 'game/engine.js'],
   ['npc', 'ui/npc.js'],
   ['mobile', 'ui/mobile.js'],
+  ['landscape', 'ui/landscape.js'],
   ['screen', 'ui/screen.js'],
   ['app', 'ui/app.js'],
 ];
@@ -47,6 +48,7 @@ function modTag(p) {
   if (p.indexOf('map') >= 0) return 'map';
   if (p.indexOf('npc') >= 0) return 'npc';
   if (p.indexOf('mobile') >= 0) return 'mobile';
+  if (p.indexOf('landscape') >= 0) return 'landscape';
   if (p.indexOf('screen') >= 0) return 'screen';
   if (p.indexOf('app') >= 0) return 'app';
   return p;

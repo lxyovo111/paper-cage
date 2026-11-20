@@ -1,8 +1,8 @@
-# 《纸上牢笼》· 交付状态（2026-11-20 19:05）
+# 《纸上牢笼》· 交付状态（2026-11-20 21:45）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-20 04:46 重新部署成功：200 / 130012 字符 / 含 report-live）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-20 21:33 重新部署成功：200 / 150298 字符 / 含 report-live + 手机横屏版式；内容与本机 dist/index.html 逐字符一致）
 - 演示视频（90 秒，含开/关 AI 对照）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （200 / video/mp4 / 5.5 MB）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
@@ -58,6 +58,18 @@
 - **验证**：部署后调用线上 /gradio_api/call/npc compile → 返回 429 insufficient balance（key 有效、余额为 0；若仍持有旧 key 应返回 401）→ **新 key 已生效**。 /play 200 / 130012 字符 / 含 report-live。
 - **影响**：余额为 0 时游戏仍可玩（本地规则兜底），但 AI 层（编译/挑路/夜间独白）全部降级为模板 → 评审期需要魔粒。每日可得：登录 200 + 绑定阿里云 50 ≈ 250；创空间/文章影响力各 +50（浏览≥100 且喜欢≥5）。
 - **待做（可选，省魔粒）——2026-11-20 用户决定不做，保持现状**：① ui/app.js:475 的 warm 从页面加载挪到点「进入」；② 夜间独白 remark 改本地模板（每局 21→14 次）；③ 编译按句子缓存。目标把每局 21 次调用降到 8–10 次。
+
+## 手机横屏版式（2026-11-20 20:40–21:40）
+- **背景**：手机横屏（844×390）原来落进桌面 1600×1000 版式，被压成 624×390，字小到不可读。
+- **新增 `ui/landscape.js`**（画布 1180×546，操作比例贴近 844×390）：左栏平面图 440 宽 + 下方巡查报告；右栏六条狱规 + 服从度/敌意 + 右下「入夜」红章；另含横屏判决书 `renderLandscapeSettle()`。
+- **`ui/intro.js`** 增 `renderIntroLandscape()`（横屏封面，标题 92px、红章「进入」、右侧提示「点击红章开始 / 建议横屏」）；页眉整体左移避开左上角静音钮。
+- **`ui/app.js`** 三档 `viewMode()`（mobile / landscape / desktop），封面、正文、判决书分别走对应渲染器；夜间报告的打字排版参数改由 `#report-live` 的 `data-cfg` 自带（竖屏数值写进 mobile.js，行为不变）。
+- **`styles.css`** 新增媒体查询 `(orientation:landscape) and (max-height:560px) and (max-width:1180px)`：`#stage` 按 1180/546 铺满、无阴影，写规矩弹层（`.sheet`）压缩到 92vh 内、两列示例、按钮缩小。
+- **`tools/bundle.mjs`** 加入 landscape 模块；dist/index.html 从 144,538 → **165,643 字节**。
+- **验证**：`node tools/dist-test.mjs` 桌面全流程 settle、errors=none；`node tools/mtest2.mjs` 竖屏 settle 正常；横屏 844×390（CDP 设备模拟，DPR 3）全流程走通：封面→进入→写规矩（AI 编译）→入夜→预判→次日巡查报告，5 行报告（含 AI「因为…」）不溢出。截图：`tools/_l2-cover.png`、`tools/_l2-sheet.png`、`tools/_l4-day1.png`、`tools/_l4-night.png`、`tools/_l2-settle.png`。
+- **上线**：index.html 已上传创空间（commit d190e55a，165,643 B）→ 21:17 触发重新部署 → 21:32 Creating → **21:33 Running**；`/play` 200 且与本机 dist 逐字符一致。
+- **AI 冒烟**：部署后线上 `/gradio_api/call/npc` compile 返回 `{"ok":true,"lang":{"window":{"from":1320,"to":300},...}}`（魔粒已恢复，AI 层正常；余额为 0 时会自动降级为模板）。
+
 ## 待办 / 可选
 - 玩法/难度/夜戏已上线，桌面+手机真机夜戏验收通过；建议用户亲自再玩一局确认难度手感（尤其第 4 夜起的一夜两步）
 - 音频听感验收：需要人耳确认音量配比（BGM 0.16/0.20，音效 0.35–0.65）是否合适，可再调

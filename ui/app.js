@@ -1,7 +1,8 @@
 // app.js — 游戏主控。渲染归 screen.js，判定归 engine.js，语言归 npc.js。
 import { renderScreen } from './screen.js';
 import { renderMobile, renderMobileSettle, isMobileView } from './mobile.js';
-import { renderIntro, renderIntroMobile } from './intro.js';
+import { renderLandscape, renderLandscapeSettle, isLandscapeView } from './landscape.js';
+import { renderIntro, renderIntroMobile, renderIntroLandscape } from './intro.js';
 import { audio } from './audio.js';
 import * as E from '../game/engine.js';
 import { compileSmart, chooseHole, remark, warm, llmOn } from './npc.js';
@@ -56,18 +57,31 @@ function syncView() {
   view.obedience = Math.round(g.obedience); view.hostility = Math.round(g.hostility);
   view.rules = g.rules.map((r) => ({ text: r.text, note: r.note }));
 }
+// 版式三选一：竖屏手机 / 横屏手机 / 桌面。规则与判定完全一致，只换排版。
+function viewMode() {
+  if (isMobileView()) return 'mobile';
+  if (isLandscapeView()) return 'landscape';
+  return 'desktop';
+}
 async function paint() {
-  // 进入界面：封面也分横竖两版，和游戏本体用同一套纸与印章
+  const mode = viewMode();
+  // 进入界面：封面也分横竖三版，和游戏本体用同一套纸与印章
   if (view && view.phase === 'cover') {
-    if (isMobileView()) { stage.style.aspectRatio = '800 / 1840'; stage.innerHTML = renderIntroMobile(); }
+    if (mode === 'mobile') { stage.style.aspectRatio = '800 / 1840'; stage.innerHTML = renderIntroMobile(); }
+    else if (mode === 'landscape') { stage.style.aspectRatio = ''; stage.innerHTML = renderIntroLandscape(); }
     else { stage.style.aspectRatio = ''; stage.innerHTML = renderIntro(); }
     return;
   }
-  // 手机竖屏走 mobile.js 的纵向版式；桌面仍是 screen.js 的 1600×1000 一屏。规则与判定完全一致。
-  if (isMobileView()) {
+  // 手机竖屏走 mobile.js 的纵向版式；横屏走 landscape.js 的横排版式；桌面仍是 screen.js 的 1600×1000 一屏。
+  if (mode === 'mobile') {
     const settle = view.phase === 'settle';
     stage.style.aspectRatio = settle ? '800 / 1500' : '800 / 1840';
     stage.innerHTML = settle ? renderMobileSettle(view) : renderMobile(view);
+    return;
+  }
+  if (mode === 'landscape') {
+    stage.style.aspectRatio = '';
+    stage.innerHTML = view.phase === 'settle' ? renderLandscapeSettle(view) : renderLandscape(view);
     return;
   }
   stage.style.aspectRatio = '';
@@ -334,9 +348,19 @@ async function runNight() {
   const evs = res.events.slice();
   const compact = res.events.length > 5;   // 按原始条数判断，否则删掉「熄灯」后又被判成宽松排版，最后一条会被挤掉
   if (compact) { const si = evs.findIndex(function (e) { return e.kind === 'start'; }); if (si >= 0) evs.splice(si, 1); }
+  // 版式参数由 #report-live 的 data-cfg 自己带（桌面/竖屏/横屏三套），这里不再判断设备
+  let liveCfg = null;
+  try {
+    const raw = live && live.getAttribute && live.getAttribute('data-cfg');
+    if (raw) liveCfg = JSON.parse(raw);
+  } catch (err) { liveCfg = null; }
   const mobileView = isMobileView();
-  const pitch = compact ? (mobileView ? 20 : 24) : 30;
-  const maxY = compact ? (mobileView ? 892 : 912) : 906;
+  const pitch = liveCfg && liveCfg.pitch
+    ? (compact ? (liveCfg.pitchCompact || liveCfg.pitch) : liveCfg.pitch)
+    : (compact ? (mobileView ? 20 : 24) : 30);
+  const maxY = liveCfg && liveCfg.maxY
+    ? (compact ? (liveCfg.maxYCompact || liveCfg.maxY) : liveCfg.maxY)
+    : (compact ? (mobileView ? 892 : 912) : 906);
   let y = 792;
   for (const ev of evs) {
     if (y > maxY) break;
@@ -461,11 +485,11 @@ document.addEventListener('keydown', (ev) => {
     ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame();
   }
 });
-// 手机 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
-let __wasMobile = isMobileView();
+// 竖屏 ↔ 横屏 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
+let __wasMode = viewMode();
 window.addEventListener('resize', () => {
-  const now = isMobileView();
-  if (now !== __wasMobile) { __wasMobile = now; paint(); }
+  const now = viewMode();
+  if (now !== __wasMode) { __wasMode = now; paint(); }
 });
 
 // 首次交互解锁音频（浏览器不允许页面加载即播放）；封面点击也会走这里
