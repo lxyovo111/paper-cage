@@ -219,6 +219,17 @@ svg.intro { display: block; width: 100%; height: 100%; }
 @media (max-width: 900px) and (orientation: portrait) {
   #mute-btn { width: 22px; height: 22px; left: 1.2%; top: 12.2%; font-size: 10px; opacity: .4; }
 }
+/* ---------- 首屏阶段提示与封面兜底（2026-11-21） ---------- */
+#boot .boot-hint{display:flex;align-items:center;gap:8px;font-family:var(--song);font-size:11px;letter-spacing:1.5px;color:#8d7c63}
+#boot .boot-hint[hidden]{display:none}
+#boot-retry{font-family:var(--song);font-size:11px;letter-spacing:1px;color:#d9c9a8;background:transparent;
+  border:1px solid rgba(217,201,168,.4);padding:4px 10px;cursor:pointer;border-radius:0}
+#boot-retry:hover{border-color:rgba(217,201,168,.85)}
+/* 整张封面盖一个真实 HTML 按钮：SVG 点击合成失效的 WebView 也能进；静音钮 z-index 30 更高，不受影响 */
+#enter-fallback{position:absolute;inset:0;z-index:5;background:transparent;border:0;padding:0;margin:0;
+  cursor:pointer;-webkit-tap-highlight-color:transparent}
+#stage.starting .cover-seal{opacity:.45;transition:opacity .12s ease}
+
 </style>
 </head>
 <body>
@@ -308,7 +319,8 @@ M["paper"] = {C:C, KAI:KAI, SONG:SONG, buildDefs:buildDefs, buildPaper:buildPape
 (function(){
 // intro.js — 进入界面（封面）。桌面 1600x1000，手机竖屏 800x1840。
 // 只负责「看起来怎样」：返回 SVG 字符串，不碰状态、不碰判定。
-// 与外部唯一契约：输出里必须有一个 data-act="start" 的元素 —— 点它才开始新一局。
+// 与外部唯一契约：输出里必须有 data-act="start" 的元素 —— 点它才开始新一局。
+// 2026-11-21：整张封面都包在 <g data-act="start"> 里，点标题/空白也能开始（不只红章）。
   const { C, KAI, SONG, buildDefs, buildPaper } = M["paper"];
 function esc(s) {
   return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -369,6 +381,7 @@ function renderIntro() {
   let s = `<svg class="intro" viewBox="0 0 1600 1000" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(1600, 1000);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   // 页眉
   s += T(132, 88, "案  卷", { size: 13, tracking: 2 });
   s += T(214, 88, "No.07 / 19", { size: 13, kai: false, tracking: 2, fill: C.INK2 });
@@ -389,6 +402,7 @@ function renderIntro() {
   // 红章 = 开始
   s += seal(800, 862, 134, "进入");
   s += T(800, 972, "点击红章开始 · 一局约 8 分钟", { size: 12, fill: C.MUT2, anchor: "middle", tracking: 2 });
+  s += "</g>";
   return s + "</svg>";
 }
 
@@ -396,6 +410,7 @@ function renderIntroLandscape() {
   let s = `<svg class="intro" viewBox="0 0 1180 546" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(1180, 546);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   s += T(64, 30, "案  卷", { size: 12, tracking: 2 });
   s += T(138, 30, "No.07 / 19", { size: 12, kai: false, tracking: 2, fill: C.INK2 });
   s += T(64, 50, "内部资料 · 尚未结案", { size: 10.5, fill: C.MUTED, tracking: 1 });
@@ -413,6 +428,7 @@ function renderIntroLandscape() {
   s += seal(590, 476, 104, "进入");
   s += T(700, 470, "点击红章开始", { size: 13, fill: C.MUT2, tracking: 2 });
   s += T(700, 492, "一局约 8 分钟 · 建议横屏", { size: 10.5, fill: C.MUT2, tracking: 1 });
+  s += "</g>";
   return s + "</svg>";
 }
 
@@ -420,6 +436,7 @@ function renderIntroMobile() {
   let s = `<svg class="intro" viewBox="0 0 800 1840" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(800, 1840);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   s += T(36, 66, "案  卷", { size: 21, tracking: 3 });
   s += T(132, 66, "No.07 / 19", { size: 21, kai: false, tracking: 2, fill: C.INK2 });
   s += T(36, 100, "内部资料 · 尚未结案", { size: 17, fill: C.MUTED, tracking: 1 });
@@ -438,6 +455,7 @@ function renderIntroMobile() {
   s += T(400, 1572, "点击红章开始", { size: 22, fill: C.MUT2, anchor: "middle", tracking: 3 });
   s += T(400, 1618, "一局约 8 分钟 · 建议竖屏", { size: 17, fill: C.MUT2, anchor: "middle", tracking: 2 });
   s += T(400, 1778, "魔搭创空间 · AI 造游戏", { size: 16, fill: C.MUT2, anchor: "middle", tracking: 2 });
+  s += "</g>";
   return s + "</svg>";
 }
 
@@ -2775,6 +2793,23 @@ function viewMode() {
   if (isLandscapeView()) return 'landscape';
   return 'desktop';
 }
+function clearCoverAids() {
+  const st = document.getElementById('stage');
+  if (st) st.classList.remove('starting');
+  const fb = document.getElementById('enter-fallback'); if (fb) fb.remove();
+  const se = document.getElementById('start-err'); if (se) se.remove();
+}
+// 真实 HTML 兜底按钮：整张封面范围，SVG 点击失效时也能进
+function mountFallback() {
+  if (document.getElementById('enter-fallback')) return;
+  const b = document.createElement('button');
+  b.id = 'enter-fallback';
+  b.type = 'button';
+  b.dataset.act = 'start';
+  b.setAttribute('aria-label', '进入游戏');
+  b.title = '进入游戏';
+  stage.appendChild(b);
+}
 async function paint() {
   const mode = viewMode();
   // 进入界面：封面也分横竖三版，和游戏本体用同一套纸与印章
@@ -2782,22 +2817,28 @@ async function paint() {
     if (mode === 'mobile') { stage.style.aspectRatio = '800 / 1840'; stage.innerHTML = renderIntroMobile(); }
     else if (mode === 'landscape') { stage.style.aspectRatio = ''; stage.innerHTML = renderIntroLandscape(); }
     else { stage.style.aspectRatio = ''; stage.innerHTML = renderIntro(); }
+    mountFallback();
+    bootReady();
     return;
   }
+  clearCoverAids();
   // 手机竖屏走 mobile.js 的纵向版式；横屏走 landscape.js 的横排版式；桌面仍是 screen.js 的 1600×1000 一屏。
   if (mode === 'mobile') {
     const settle = view.phase === 'settle';
     stage.style.aspectRatio = settle ? '800 / 1500' : '800 / 1840';
     stage.innerHTML = settle ? renderMobileSettle(view) : renderMobile(view);
+    bootReady();
     return;
   }
   if (mode === 'landscape') {
     stage.style.aspectRatio = '';
     stage.innerHTML = view.phase === 'settle' ? renderLandscapeSettle(view) : renderLandscape(view);
+    bootReady();
     return;
   }
   stage.style.aspectRatio = '';
   stage.innerHTML = await renderScreen(view);
+  bootReady();
 }
 async function centers() {
   try {
@@ -3190,21 +3231,81 @@ async function showSettle() {
 }
 
 // ---------- 点击 ----------
+// 封面兜底（2026-11-21）：整个封面都是热区（intro.js 用 <g data-act="start"> 包住），
+// 再加一个真实 HTML 按钮（#enter-fallback）盖在封面上——个别 WebView 对 SVG 的点击合成不可靠。
+// 同时把 click / touchend / pointerup 都接上，700ms 内去重，避免浏览器补发 click 造成重开。
+let lastStartAt = 0;
+function actOf(node) {
+  let n = node;
+  while (n && n !== document) {
+    if (n.dataset && n.dataset.act) return n;
+    n = n.parentNode || n.host || null;
+  }
+  return null;
+}
+function startFeedback() {
+  const st = document.getElementById('stage');
+  if (st) st.classList.add('starting');
+}
+function startError(err) {
+  startFeedback();
+  let d = document.getElementById('start-err');
+  if (!d) {
+    d = document.createElement('div');
+    d.id = 'start-err';
+    d.textContent = '打开失败，请刷新重试';
+    d.style.cssText = 'position:absolute;left:50%;bottom:12%;transform:translateX(-50%);z-index:40;' +
+      'background:rgba(34,29,25,.92);color:#f0e6d0;font-family:var(--song);font-size:13px;letter-spacing:1px;' +
+      'padding:8px 16px;border:1px solid rgba(240,230,208,.3);pointer-events:none';
+    (document.getElementById('stage') || document.body).appendChild(d);
+  }
+  try { console.error('[start]', err); } catch (_) {}
+}
+function startGame() {
+  if (Date.now() - lastStartAt < 700) return;
+  lastStartAt = Date.now();
+  startFeedback();
+  try {
+    audio.init(); audio.sfx('stamp');
+    newGame();
+    setTimeout(warm, 900);
+  } catch (err) { startError(err); }
+}
+function tryStart(ev) {
+  const el = actOf(ev && ev.target);
+  if (!el) return false;
+  const act = el.dataset.act;
+  if (act !== 'start' && act !== 'again') return false;
+  startGame();
+  return true;
+}
 document.addEventListener('click', (ev) => {
-  const el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+  if (tryStart(ev)) return;
+  const el = actOf(ev.target);
   if (!el) return;
   const act = el.dataset.act;
-  if (act === 'start' || act === 'again') { audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900); return; }
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
 });
+// 部分移动浏览器在 SVG 上不合成 click：touchend / pointerup 各兜一层（startGame 内有 700ms 去重）
+document.addEventListener('touchend', (ev) => { if (view && view.phase === 'cover') tryStart(ev); }, { passive: true });
+document.addEventListener('pointerup', (ev) => { if (view && view.phase === 'cover' && ev.pointerType !== 'mouse') tryStart(ev); }, { passive: true });
+// 按下就给出反馈，别让人等一个 click 才知道点到了
+document.addEventListener('pointerdown', (ev) => {
+  if (!view || view.phase !== 'cover') return;
+  const el = actOf(ev.target);
+  if (el && el.dataset.act === 'start') startFeedback();
+}, { capture: true, passive: true });
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape') closeSheet();
   // 封面支持回车 / 空格开始
   if (view && view.phase === 'cover' && (ev.key === 'Enter' || ev.key === ' ')) {
-    ev.preventDefault(); audio.init(); audio.sfx('stamp'); newGame(); setTimeout(warm, 900);
+    ev.preventDefault(); startGame();
   }
 });
+// 开局/渲染异常不再静默：封面阶段显示一行提示，方便用户刷新而不是以为点坏了
+window.addEventListener('error', (ev) => { if (view && view.phase === 'cover') startError(ev.error || new Error(ev.message || 'error')); });
+window.addEventListener('unhandledrejection', (ev) => { if (view && view.phase === 'cover') startError(ev.reason || new Error('rejection')); });
 // 竖屏 ↔ 横屏 ↔ 桌面切换（旋转屏幕 / 拉伸窗口）时换版式重画
 let __wasMode = viewMode();
 window.addEventListener('resize', () => {
@@ -3212,19 +3313,36 @@ window.addEventListener('resize', () => {
   if (now !== __wasMode) { __wasMode = now; paint(); }
 });
 
-// 首次交互解锁音频（浏览器不允许页面加载即播放）；封面点击也会走这里
-document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
-// ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
-if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
-// 预热语言模型：挪到点「进入」之后（页面加载时发只是白占首屏带宽与并发），
-// 提前 900ms 起跑，等玩家写完第一条规矩时模型已经热了。
+// 首屏占位分三段真实阶段（HTML 已到 / 脚本已跑 / 版式已画好），不显示假百分比
+let __booted = false;
+function bootStage(t) {
+  if (__booted) return;
+  const el = document.getElementById('boot-stage');
+  if (el) el.textContent = t;
+}
+function bootReady() {
+  if (__booted) return;
+  __booted = true;
+  const el = document.getElementById('boot-stage');
+  if (el) el.textContent = '案卷已就绪';
+  bootDone();
+}
 function bootDone() {
   const b = document.getElementById('boot');
   if (!b) return;
   b.classList.add('boot-done');
   setTimeout(function () { if (b.parentNode) b.parentNode.removeChild(b); }, 600);
 }
-requestAnimationFrame(function () { requestAnimationFrame(function () { setTimeout(bootDone, 120); }); });
+bootStage('正在铺开桌面…');
+// 8s 提示与刷新按钮在 index.html 的普通脚本里（模块加载失败时也生效）
+// 兜底：万一 paint 抛错，2.5s 后也先撤掉占位，至少能看到页面与错误提示
+setTimeout(function () { bootReady(); }, 2500);
+// 首次交互解锁音频（浏览器不允许页面加载即播放）；封面点击也会走这里
+document.addEventListener('pointerdown', function () { audio.init(); }, { once: true, capture: true });
+// ?intro=0 跳过封面（自动化测试与录屏用）；默认先显示进入界面
+if (/[?&]intro=0/.test(location.search)) newGame(); else showCover();
+// 预热语言模型：挪到点「进入」之后（页面加载时发只是白占首屏带宽与并发），
+// 提前 900ms 起跑，等玩家写完第一条规矩时模型已经热了。
 window.__game = { get g() { return g; }, get view() { return view; }, newGame, showCover, E, showSettle, askNight, askWrite };
 window.__audio = audio;
 M["app"] = {};

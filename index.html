@@ -7,13 +7,26 @@
 <link rel="stylesheet" href="./styles.css">
 </head>
 <body>
-<div id="boot"><div class="boot-t">纸 上 牢 笼</div><div class="boot-s">正在打开案卷…</div></div>
+<div id="boot">
+  <div class="boot-t">纸 上 牢 笼</div>
+  <div class="boot-s" id="boot-stage">正在打开案卷…</div>
+  <div class="boot-hint" id="boot-hint" hidden>打开较慢？<button id="boot-retry" type="button">刷新重试</button></div>
+</div>
 <div id="desk">
   <div id="stage">
     <div id="screen"></div>
     <div id="overlay"></div>
   </div>
 </div>
+<script>
+// 8 秒仍未就绪：给一条可操作的提示（放在模块外，脚本加载失败时也生效）
+setTimeout(function () {
+  var h = document.getElementById('boot-hint');
+  if (h && document.getElementById('boot')) h.hidden = false;
+}, 8000);
+var __br = document.getElementById('boot-retry');
+if (__br) __br.addEventListener('click', function () { location.reload(); });
+</script>
 <script type="module" src="./ui/app.js"></script>
 </body>
 </html>

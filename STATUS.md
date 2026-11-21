@@ -1,8 +1,8 @@
-# 《纸上牢笼》· 交付状态（2026-11-21 10:45）
+# 《纸上牢笼》· 交付状态（2026-11-21 12:55）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 10:39 重新部署成功：200 / 154,751 字符（171,612 B，gzip 传输约 53 KB）/ 含 report-live + 心情阈值行 + 手机横屏版式 + 首屏占位；内容与本机 dist/index.html 逐字符一致）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 12:47 重新部署成功：200 / 159,318 字符（176,899 B，gzip 传输 54,908 B）/ 含进入兜底 + 首屏三段提示 + 心情阈值行 + 手机横屏版式；内容与本机 dist/index.html 逐字符一致；ETag W/"668328dcbf01f02af73f3016"，带 if-none-match → 304）
 - 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
@@ -30,7 +30,7 @@
 **边界（不可控）**：平台作品页 12.4 MB JS、Gradio 外壳启动、免费 CPU 按需实例冷启动都在平台侧；桌面快网复测 cover 5,156ms（平台页占大头），gzip 的收益主要体现在 4G/慢网（少下 115 KB）与二次打开（`/static` 304/长缓存）。直连 `ms.show/play` 仍 302 回平台页，不能当快速入口。
 
 ## 已交付
-- 游戏本体：单文件自包含 dist/index.html（2026-11-21 10:39 上线版 171,612 字节；横屏/竖屏/桌面三版式 + 首屏加速 + 阈值行为），确定性规则引擎 + SVG 全屏 UI + 夜戏动画
+- 游戏本体：单文件自包含 dist/index.html（2026-11-21 12:47 上线版 176,899 字节；横屏/竖屏/桌面三版式 + 首屏加速 + 阈值行为 + 进入兜底），确定性规则引擎 + SVG 全屏 UI + 夜戏动画
 - AI 语言层：魔搭 API Inference（Qwen/Qwen3.8-27B，关思维链），三处用途 = 编译规矩 / 在引擎漏洞清单里挑路线 / 夜间一句独白；全部有本地兜底，界面不阻塞
 - 演示视频：72.87s / 1600×1000 / 5.84 MB，结构 = 标题卡 → 写规矩+AI 校准 → 第一夜 → 第二夜被规矩堵住 → A/B 对照卡 → 快进七天 → 判决书 → 尾卡
 - 创作手记：六节官方模板 + 第 7 节「开源与对照实验」+ 第 8 节「11-20 更新：AI 的记忆与状态」（含 2026-11-21 阈值行为补充）；公开页正文约 4.9 千字符，含试玩/视频/工具实测数据（0.7–2.7s vs 25s+）；2026-11-18 已改名为《纸上牢笼》并修复一次正文重复事故（现正文单份、8 节齐全）
@@ -120,6 +120,28 @@
 **发布**：app.py + dist/index.html 上传创空间（32 提交）→ 10:34 触发 → **10:38:57 Running**；/play 200 / 154,751 字符，与本机 dist 逐字符一致；线上 /gradio_api/call/npc 冒烟：revenge 返回 {"ok":true,"id":"window","reason":"撞烂那条拦我三次的工具间规矩"}（点名了那条规矩）、compile 正常。
 **文档**：README 新增「阈值行为」小节与评审速览条目；创作手记第 8 节追加一段（已发布，公开页含「阈值行为（2026-11-21 补）」）；docs/创作手记.md 同步。
 
+## 进入点击兜底与首屏阶段提示（2026-11-21 12:20–12:55，已上线）
+
+**问题**：部分用户反馈「点了进入没反应」。排查发现封面唯一热区是红章那枚 g.cover-seal[data-act=start]（桌面 134px、竖屏约 128 CSS px），点标题/空白完全无反应；而部分设备 WebView 不合成 SVG 元素上的 click，点红章也没反应。另 start 路径没有 try/catch，若 newGame() 抛错则静默失败。
+
+**改法（A 点击兜底 + B 首屏真实阶段）**：
+1. ui/intro.js 三套封面（桌面/竖屏/横屏）都包进 g.cover-hit[data-act=start]，整张封面都是热区；红章不再需要精确点中。
+2. ui/app.js 新增 #enter-fallback：真实 HTML button，position:absolute;inset:0;z-index:5 覆盖封面，SVG 点击失效的 WebView 也能进（静音钮 z-index 30 在其上，不误触）。
+3. 三级事件兜底：click + touchend + pointerup（非鼠标），700ms 去重；pointerdown 立即给红章压暗反馈（#stage.starting）；Enter/空格也能开局。
+4. startGame() 包 try/catch，失败在底部显示「打开失败，请刷新重试」；error/unhandledrejection 仅在封面阶段显示该提示。
+5. 首屏占位分三段真实文案：正在打开案卷… → 正在铺开桌面… → 案卷已就绪（不显示假百分比）；8 秒未就绪显示「打开较慢？刷新重试」，该计时器放在 index.html 的普通脚本里，模块加载失败也生效。
+6. 2.5s 兜底 bootReady()：万一 paint 抛错，至少撤掉占位露出页面与错误提示。
+
+**验证（本地 1600×1000 鼠标 + iPhone 390×844 真 touch，CDP 设备模拟）**：
+- 桌面：封面空白/标题点击 → phase=day, day=1；按下未松手 → starting=true 且仍 cover；点静音钮 → muted=true 且不误开局；点底部空白 → day。
+- 竖屏：真 touch 点标题 (195,300) → day；无异常。
+- 首屏失败路径：屏蔽 app.js 后 8s，页面显示「正在打开案卷… / 打开较慢？[刷新重试]」。
+- node tools/dist-test.mjs settle（day7/rules6/nights6/errors=none）；node tools/mtest2.mjs 竖屏 settle + LINES 4 无错；打包产物 dist/index.html 176,899 B，含 enter-fallback / boot-stage / cover-hit。
+
+**上线与线上验收**：上传 dist/index.html（创空间 34 提交）→ 12:39 触发 → **12:45:37 Creating → 12:47:06 Running**；/play 200 / gzip 54,908 B / ETag 变更 / 与本地 dist 逐字符一致；标记全在；304 复验 0 字节。真实平台页 iframe（1570×1019）里用 CDP 点封面空白 → phase=day, day=1（改前点空白无反应）。
+
+**Git**：本段代码与 STATUS 同批提交并 push（见 GitHub main 最新 commit）。
+
 ## 待办 / 可选
 - 玩法/难度/夜戏已上线，桌面+手机真机夜戏验收通过；建议用户亲自再玩一局确认难度手感（尤其第 4 夜起的一夜两步）
 - 音频听感验收：需要人耳确认音量配比（BGM 0.16/0.20，音效 0.35–0.65）是否合适，可再调
@@ -135,4 +157,5 @@
 - 无头回归：`node tools/dist-test.mjs`
 - 平衡模拟：`node tools/seedscan2.mjs`（120 局，反应式玩家；最新：失守72/账本37/铁壁7/记得4，逃逸 60%）；`node tools/seedscan.mjs`（静态六条，逃逸 84%）
 - 视频重拼：`node tools/gen-segments.mjs && node tools/mkfilm2.mjs tools/demo-90.mp4 tools/segments.json`
-- 部署：settings 页 → upload3.mjs → redeploy6.mjs（约 10 分钟）
+- 部署：`node tools/_upload-mdj.mjs "<绝对路径>"` 上传（只接受平铺文件）→ `node tools/_deploynow.mjs` 触发（settings → 重新部署 → 确认部署）→ `node tools/_watch-deploy2.mjs <旧DeployedTime>` 轮询到 Running（约 5–16 分钟）
+- 线上校验：`node tools/_verify-ab.mjs`（/play 头与标记、gzip、304、与本地 dist 逐字符比对）

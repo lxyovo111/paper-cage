@@ -1,6 +1,7 @@
 // intro.js — 进入界面（封面）。桌面 1600x1000，手机竖屏 800x1840。
 // 只负责「看起来怎样」：返回 SVG 字符串，不碰状态、不碰判定。
-// 与外部唯一契约：输出里必须有一个 data-act="start" 的元素 —— 点它才开始新一局。
+// 与外部唯一契约：输出里必须有 data-act="start" 的元素 —— 点它才开始新一局。
+// 2026-11-21：整张封面都包在 <g data-act="start"> 里，点标题/空白也能开始（不只红章）。
 import { C, KAI, SONG, buildDefs, buildPaper } from "./paper.js";
 
 function esc(s) {
@@ -62,6 +63,7 @@ export function renderIntro() {
   let s = `<svg class="intro" viewBox="0 0 1600 1000" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(1600, 1000);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   // 页眉
   s += T(132, 88, "案  卷", { size: 13, tracking: 2 });
   s += T(214, 88, "No.07 / 19", { size: 13, kai: false, tracking: 2, fill: C.INK2 });
@@ -82,6 +84,7 @@ export function renderIntro() {
   // 红章 = 开始
   s += seal(800, 862, 134, "进入");
   s += T(800, 972, "点击红章开始 · 一局约 8 分钟", { size: 12, fill: C.MUT2, anchor: "middle", tracking: 2 });
+  s += "</g>";
   return s + "</svg>";
 }
 
@@ -89,6 +92,7 @@ export function renderIntroLandscape() {
   let s = `<svg class="intro" viewBox="0 0 1180 546" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(1180, 546);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   s += T(64, 30, "案  卷", { size: 12, tracking: 2 });
   s += T(138, 30, "No.07 / 19", { size: 12, kai: false, tracking: 2, fill: C.INK2 });
   s += T(64, 50, "内部资料 · 尚未结案", { size: 10.5, fill: C.MUTED, tracking: 1 });
@@ -106,6 +110,7 @@ export function renderIntroLandscape() {
   s += seal(590, 476, 104, "进入");
   s += T(700, 470, "点击红章开始", { size: 13, fill: C.MUT2, tracking: 2 });
   s += T(700, 492, "一局约 8 分钟 · 建议横屏", { size: 10.5, fill: C.MUT2, tracking: 1 });
+  s += "</g>";
   return s + "</svg>";
 }
 
@@ -113,6 +118,7 @@ export function renderIntroMobile() {
   let s = `<svg class="intro" viewBox="0 0 800 1840" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet">`;
   s += buildDefs();
   s += buildPaper(800, 1840);
+  s += '<g class="cover-hit" data-act="start" style="cursor:pointer">';
   s += T(36, 66, "案  卷", { size: 21, tracking: 3 });
   s += T(132, 66, "No.07 / 19", { size: 21, kai: false, tracking: 2, fill: C.INK2 });
   s += T(36, 100, "内部资料 · 尚未结案", { size: 17, fill: C.MUTED, tracking: 1 });
@@ -131,5 +137,6 @@ export function renderIntroMobile() {
   s += T(400, 1572, "点击红章开始", { size: 22, fill: C.MUT2, anchor: "middle", tracking: 3 });
   s += T(400, 1618, "一局约 8 分钟 · 建议竖屏", { size: 17, fill: C.MUT2, anchor: "middle", tracking: 2 });
   s += T(400, 1778, "魔搭创空间 · AI 造游戏", { size: 16, fill: C.MUT2, anchor: "middle", tracking: 2 });
+  s += "</g>";
   return s + "</svg>";
 }
