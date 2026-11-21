@@ -200,10 +200,33 @@ export function ruleStrength(state, rule) {
   const broad = zones === 'ALL' || (window.from === 0 && window.to === 1439);
   let p = broad ? 0.55 : 1.0;
   if (state.obedience < 45) p *= 0.55 + 0.45 * (state.obedience / 45);   // 服从度垮了，纸上的规矩就没人执行
+  if (state.obedience < 40 && broad) p *= 0.5;   // 阈值：服从度跌破 40，大而空的规矩基本没人去巡（写得具体的还能执行）
   if (state.blackout) p *= 0.70;
   p *= Math.max(0.55, 1 - 0.08 * (rule.leaks || 0));   // 漏过一次的规矩，下次更容易被摸清
   p *= Math.max(0.45, 1 - 0.10 * (rule.wear || 0));    // 同一句话拦过他好几次，他就把那句话背下来了
   return Math.max(0.15, Math.min(1, p));
+}
+
+// ---------------- 心情（阈值行为） ----------------
+// 阈值行为不是演出，而是引擎状态：同一个囚犯，在不同敌意/服从度下会做出不同的选择。
+// ① 敌意 ≥ 70 且有一条规矩拦过他 ≥ 2 次 → 报复：优先回去撞那条规矩，而且不换路
+// ② 服从度 < 40 → 懈怠：大而空的规矩没人执行（ruleStrength 里另有系数），他会专门挑那些缝
+// 这份心情会写进漏洞排序、夜间报告和 LLM 的输入；LLM 只能在这个阈值允许的范围内解释。
+export function moodOf(state) {
+  const best = Object.keys(state.grudge || {})
+    .map(id => ({ rule:(state.rules || []).find(r => r.id === id), n:state.grudge[id] || 0 }))
+    .filter(x => x.rule && x.n > 0)
+    .sort((a, b) => b.n - a.n)[0];
+  if (state.hostility >= 70 && best && best.n >= 2) {
+    return { kind:'revenge', rule:best.rule, n:best.n, note:'他今晚只想报复那条规矩' };
+  }
+  if (state.obedience < 40) return { kind:'sloppy', rule:null, n:0, note:'狱警懈怠，大而空的规矩没人执行' };
+  return { kind:'normal', rule:null, n:0, note:'' };
+}
+function routeTouchesRule(route, rule) {
+  const zones = rule.lang.zones;
+  if (zones === 'ALL') return true;
+  return route.steps.some(s => zones.includes(s.room));
 }
 
 // ---------------- 局面 ----------------
@@ -281,23 +304,31 @@ export function availableRoutes(state) {
 
 export function enumerateHoles(state) {
   const out = [];
+  const mood = moodOf(state);
   const owned = new Set(state.prisoner.items || []);
   for (const route of availableRoutes(state)) {
-    let t = PARAMS.nightStart, depth = 0, blockedAt = null, blockedBy = null, weakest = 1;
+    let t = PARAMS.nightStart, depth = 0, blockedAt = null, blockedBy = null, blockedRule = null, weakest = 1;
     for (const step of route.steps) {
       t += PARAMS.stepMinutes;
       // 他口袋里已有的东西不用再去拿一次：这一步对他不构成新的风险
       if (step.act === 'TAKE' && owned.has(step.item)) { depth++; continue; }
       const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t) || ruleBlocks(r, step, t));
-      if (blk) { blockedAt = step.label; blockedBy = blk.text; weakest = ruleStrength(state, blk); break; }
+      if (blk) { blockedAt = step.label; blockedBy = blk.text; blockedRule = blk.id; weakest = ruleStrength(state, blk); break; }
       depth++;
     }
+    // 阈值行为进排序：被记仇那条规矩堵住的路最优先（兜底也按这个顺序取第一条），
+    // 只是路过它管辖区域的路次之。?llm=0 时这就是开/关 AI 在行为上的可见差异。
+    const revengeStrict = mood.kind === 'revenge' && mood.rule && blockedRule === mood.rule.id;
+    const revengeNear = mood.kind === 'revenge' && mood.rule && !revengeStrict && routeTouchesRule(route, mood.rule);
+    const revenge = revengeStrict ? 2.0 : revengeNear ? 0.5 : 0;
     out.push({ id:route.id, name:route.name, intent:route.intent, impro:!!route.minHostility, open:depth === route.steps.length,
-      depth, total:route.steps.length, blockedAt, blockedBy, strength:weakest, known:!!(state.intel && state.intel[route.id]),
+      depth, total:route.steps.length, blockedAt, blockedBy, blockedRule, strength:weakest, known:!!(state.intel && state.intel[route.id]),
+      mood: revengeStrict ? 'revenge' : (revengeNear ? 'near' : (mood.kind === 'sloppy' ? 'sloppy' : 'normal')),
       weight: depth / route.steps.length
         + (state.progress && state.progress.routeId === route.id ? 0.45 : 0)
         + (route.id === state.prediction ? 0.12 : 0)
-        + (state.habit && state.habit.route === route.id ? 0.35 : 0) });
+        + (state.habit && state.habit.route === route.id ? 0.35 : 0)
+        + revenge });
   }
   return out.sort((a, b) => b.weight - a.weight);
 }
@@ -307,6 +338,7 @@ export function simulateNight(state, choice = {}) {
   const rng = state.rng;
   const events = [];
   const route = availableRoutes(state).find(r => r.id === choice.routeId) || ROUTES[1];
+  const mood = moodOf(state);   // 入夜这一刻的心情；夜里涨的敌意留到下一夜
   const wasKnown = !!(state.intel && state.intel[route.id]);
   state.intel[route.id] = true;   // 他走过一次，这条路你就摸清了
   const push = (t, kind, text, extra = {}) => events.push({ t:fmt(t), kind, text, ...extra });
@@ -317,6 +349,9 @@ export function simulateNight(state, choice = {}) {
   const carried = new Set(state.prisoner.items);
 
   push(t, 'start', '熄灯。');
+  // 阈值行为要在报告里留证据：同一局、同一套规矩，状态不同，这一步的叙述就不同
+  if (mood.kind === 'revenge') push(t, 'note', '他今晚不太对劲。他像是冲着你那条规矩来的。');
+  else if (mood.kind === 'sloppy') push(t, 'note', '狱警今晚没精神。大而空的规矩没人去巡。');
   if (!wasKnown) push(t, 'note', '档案更新：他走的是「' + route.name + '」。');
   if (state.blackout) push(t, 'event', DAY_EVENTS[3].text);
   if (state.tutorialPending) push(t, 'note', '这是第一夜。他还在摸这间屋子。');
@@ -358,7 +393,9 @@ export function simulateNight(state, choice = {}) {
       const strength = ruleStrength(state, blk);
       if (rng() < strength) {
         const brave = state.hostility >= 70 || state.despair >= 75;
-        push(t, 'block', (brave ? '他在门口停住了' : '他在门口停了一会儿，回身走了') + '：「' + blk.text + '」。', { rule:blk.id });
+        const revengeHit = mood.kind === 'revenge' && mood.rule && blk.id === mood.rule.id;
+        push(t, 'block', (revengeHit ? '他明知道这条规矩在，还是去撞了一次'
+          : brave ? '他在门口停住了' : '他在门口停了一会儿，回身走了') + '：「' + blk.text + '」。', { rule:blk.id });
         outcome = i === 0 ? 'blocked' : 'partial';
         break;
       }
@@ -401,7 +438,9 @@ export function simulateNight(state, choice = {}) {
   if (outcome === 'blocked') state.trust = Math.min(100, state.trust + 3);
   // 他发现这条路被堵死了，换一条；同一条规矩拦他两次，他就一定换（记仇）
   const stubborn = lastBlk && (state.grudge[lastBlk.id] || 0) >= 2;
-  if (outcome === 'blocked' && (stubborn || rng() < 0.6)) { state.progress = null; }
+  // 报复心情下他偏不换路：明知道那条规矩在，第二天还从原路重来（这也是玩家可利用的可预测性）
+  const revengeStuck = mood.kind === 'revenge' && lastBlk && mood.rule && lastBlk.id === mood.rule.id;
+  if (outcome === 'blocked' && !revengeStuck && (stubborn || rng() < 0.6)) { state.progress = null; }
     state.despair = Math.min(100, state.despair + (outcome === 'caught' ? PARAMS.despairCaught : PARAMS.despairBlocked));
     state.fatigue = Math.min(100, state.fatigue + 6);
     state.obedience = Math.max(PARAMS.obedienceFloor,

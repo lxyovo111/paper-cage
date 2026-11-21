@@ -345,15 +345,17 @@ async function runNight() {
   }).catch(() => null);
   const live = stage.querySelector('#report-live');
   // 第五夜起他一夜走两步，事件会比以前多；先把「熄灯」这类气氛行省掉，保证两个动作都能看见
-  const evs = res.events.slice();
-  const compact = res.events.length > 5;   // 按原始条数判断，否则删掉「熄灯」后又被判成宽松排版，最后一条会被挤掉
-  if (compact) { const si = evs.findIndex(function (e) { return e.kind === 'start'; }); if (si >= 0) evs.splice(si, 1); }
   // 版式参数由 #report-live 的 data-cfg 自己带（桌面/竖屏/横屏三套），这里不再判断设备
   let liveCfg = null;
   try {
     const raw = live && live.getAttribute && live.getAttribute('data-cfg');
     if (raw) liveCfg = JSON.parse(raw);
   } catch (err) { liveCfg = null; }
+  const evs = res.events.slice();
+  // 紧凑排版阈值：默认 4（夜里会多一行「今晚的心情」，提早一档，保证 AI 最后一句话不被挤出纸面）
+  const compactAt = liveCfg && liveCfg.compactAt != null ? liveCfg.compactAt : 4;
+  const compact = res.events.length > compactAt;   // 按原始条数判断，否则删掉「熄灯」后又被判成宽松排版，最后一条会被挤掉
+  if (compact) { const si = evs.findIndex(function (e) { return e.kind === 'start'; }); if (si >= 0) evs.splice(si, 1); }
   const mobileView = isMobileView();
   const pitch = liveCfg && liveCfg.pitch
     ? (compact ? (liveCfg.pitchCompact || liveCfg.pitch) : liveCfg.pitch)
@@ -361,11 +363,17 @@ async function runNight() {
   const maxY = liveCfg && liveCfg.maxY
     ? (compact ? (liveCfg.maxYCompact || liveCfg.maxY) : liveCfg.maxY)
     : (compact ? (mobileView ? 892 : 912) : 906);
+  // 一行打印不下会折成两行（规矩原文经常超过一行），下一行要按实际行数让位，否则两行叠在一起
+  const cfgCols = liveCfg && liveCfg.cols ? liveCfg.cols : 42;
+  const cfgFs = liveCfg && liveCfg.fs ? Math.round(liveCfg.fs * (compact ? 0.86 : 1)) : null;
+  const rowH = liveCfg ? (cfgFs * (compact ? 1.16 : 1.3)) : (compact ? 16 : 21);
   let y = 792;
   for (const ev of evs) {
     if (y > maxY) break;
     appendLine(live, ev, y, compact);
-    y += ev.kind === 'escape' ? pitch + 4 : pitch;
+    const rowsN = ev.text ? Math.min(2, Math.ceil(Array.from(ev.text).length / cfgCols)) : 1;
+    const rowExtra = rowsN > 1 ? (rowsN - 1) * rowH : 0;
+    y += (ev.kind === 'escape' ? pitch + 4 : pitch) + rowExtra;
     await wait(ev.kind === 'escape' ? 1400 : 950);
   }
   // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。

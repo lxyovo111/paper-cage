@@ -1,6 +1,6 @@
 // npc.js — 语言层。规则引擎算事实，LLM 只负责「把玩家的话编译成判定条」和「把漏洞写成一句话」。
 // 全部带回退：LLM 超时 / 报错 / 输出不合规 → 直接用确定性规则。
-import { compileRule, ruleFromLang, noteOf, ROOMS, ACTIONS, ROUTES } from '../game/engine.js';
+import { compileRule, ruleFromLang, noteOf, ROOMS, ACTIONS, ROUTES, moodOf } from '../game/engine.js';
 
 const params = new URLSearchParams(location.search);
 const LLM_ON = params.get('llm') !== '0';
@@ -91,6 +91,13 @@ export async function chooseHole(holes, state) {
     const leaks = (state.rules || [])
       .filter((r) => (r.leaks || 0) > 0)
       .map((r) => '「' + r.text + '」漏过 ' + r.leaks + ' 次');
+    // 阈值行为：敌意 ≥70 会记仇、服从度 <40 狱警懈怠。引擎已经按这份心情排好了漏洞顺序，
+    // 模型的任务是「用记忆解释他为什么挑这条」，不是自己发明心情。
+    const mood = moodOf(state);
+    // 报复阈值会收窄候选池：引擎只把「会被那条规矩堵住的路」交给模型挑，
+    // 模型仍在清单里自主选择、并用记忆解释——但它不能把这条规矩绕过去。
+    const strict = holes.filter((h) => h.mood === 'revenge');
+    const pool = strict.length ? strict : holes;
     const memory = {
       day: state.day,
       habitLine: state.habit ? state.habit.line : '',
@@ -99,10 +106,13 @@ export async function chooseHole(holes, state) {
       grudge,
       leaks,
       progress: state.progress ? routeName(state.progress.routeId) + ' 走到第 ' + state.progress.done + ' 步' : '',
+      mood: mood.kind === 'revenge'
+        ? { kind:'revenge', rule: mood.rule.text, times: mood.n, note: mood.note }
+        : mood.kind === 'sloppy' ? { kind:'sloppy', note: mood.note } : null,
     };
     const j = await ask({
       task: 'choose',
-      holes: holes.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '' })),
+      holes: pool.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '' })),
       memory,
     });
     const hit = holes.find((h) => h.id === (j && j.id));

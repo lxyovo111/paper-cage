@@ -217,7 +217,7 @@ function reportBlock(st) {
   }
   // 夜里逐条打字：坐标沿用桌面版（y 从 792 起），由 data-cfg 折算到横屏版式
   return '<g id="report">' + g +
-    '<g id="report-live" data-cfg=\'{"x1":26,"x2":64,"y0":410,"k":1,"fs":15.5,"cols":25,"pitch":29,"pitchCompact":24,"maxY":928,"maxYCompact":925}\'></g>' +
+    '<g id="report-live" data-cfg=\'{"x1":26,"x2":64,"y0":410,"k":1,"fs":15.5,"cols":25,"pitch":29,"pitchCompact":22,"maxY":928,"maxYCompact":925}\'></g>' +
     '</g>';
 }
 

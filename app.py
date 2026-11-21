@@ -202,12 +202,24 @@ def _choose(payload):
         bits.append("上一夜他走到：" + _short(mem.get("progress"), 40))
     state_txt = "第 %s 夜，敌意 %s/100，狱警服从度 %s/100。" % (
         mem.get("day") or 1, mem.get("hostility") or 30, mem.get("obedience") or 100)
+    # 阈值行为：心情由引擎按状态算好（敌意≥70 记仇报复 / 服从度<40 狱警懈怠），
+    # 模型只能据此解释，不能改判定——它连心情都不是自己定的。
+    mood = mem.get("mood") or {}
+    if mood.get("kind") == "revenge":
+        mood_txt = "他只想报复那条规矩「%s」——它拦过他 %s 次。能撞上它的路，他会先去撞。" % (
+            _short(mood.get("rule") or "那条规矩", 30), mood.get("times") or 2)
+    elif mood.get("kind") == "sloppy":
+        mood_txt = "狱警今晚懈怠：大而空的规矩基本没人执行，他会专门挑这些缝。"
+    else:
+        mood_txt = "和平常一样，没有特别想报复的对象。"
     prompt = """今晚你要从下面的越狱路线里挑一条去试。
 
 【你记得的事】
 %s
 
 【你现在的状态】%s
+
+【今晚的心情】%s
 
 【今晚能走的路】
 %s
@@ -216,9 +228,11 @@ def _choose(payload):
 1. 只能从上面列出的 id 里挑一个。
 2. reason 必须来自【你记得的事】里的一条，写成一句具体的中文，不超过 18 个字；不要抽象、不要解释、不要用引号。
 3. 只说为什么挑这条，不要说「最可能」「最容易」这类空话。
+4. 如果【今晚的心情】是报复，reason 必须提到那条规矩；如果是懈怠，reason 要利用这一点。
+5. 心情是引擎按阈值给出的状态，不是你能选的——你只在它允许的路线里挑一条。
 
 只输出 JSON：{"id":"路线id","reason":"……"}""" % (
-        "\n".join(bits) or "（没有特别记得的事，只能凭直觉）", state_txt, "\n".join(rows))
+        "\n".join(bits) or "（没有特别记得的事，只能凭直觉）", state_txt, mood_txt, "\n".join(rows))
     raw = _chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}],
                 timeout=12.0, max_tokens=90, temperature=0.4)
     j = _json(raw)
