@@ -1,9 +1,9 @@
-# 《纸上牢笼》· 交付状态（2026-11-21 00:45）
+# 《纸上牢笼》· 交付状态（2026-11-21 10:10）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
 - 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 00:39 重新部署成功：200 / 166,994 B（gzip 传输 51,487 B）/ 含 report-live + 手机横屏版式 + 首屏占位；内容与本机 dist/index.html 逐字符一致）
-- 演示视频（90 秒，含开/关 AI 对照）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （200 / video/mp4 / 5.5 MB）
+- 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
 - 参赛报名：已审核通过（小红书方案 https://xhslink.cn/o/Afux7g4n5JK）
@@ -88,6 +88,24 @@
 - **验证**：`node tools/dist-test.mjs` 桌面全流程 settle、errors=none；`node tools/mtest2.mjs` 竖屏 settle 正常；横屏 844×390（CDP 设备模拟，DPR 3）全流程走通：封面→进入→写规矩（AI 编译）→入夜→预判→次日巡查报告，5 行报告（含 AI「因为…」）不溢出。截图：`tools/_l2-cover.png`、`tools/_l2-sheet.png`、`tools/_l4-day1.png`、`tools/_l4-night.png`、`tools/_l2-settle.png`。
 - **上线**：index.html 已上传创空间（commit d190e55a，165,643 B）→ 21:17 触发重新部署 → 21:32 Creating → **21:33 Running**；`/play` 200 且与本机 dist 逐字符一致。
 - **AI 冒烟**：部署后线上 `/gradio_api/call/npc` compile 返回 `{"ok":true,"lang":{"window":{"from":1320,"to":300},...}}`（魔粒已恢复，AI 层正常；余额为 0 时会自动降级为模板）。
+
+## 对照实验与措辞收口（2026-11-21 09:45–10:05）
+
+**背景**：用户指出「关掉模型仍有本地兜底，不能简单说没有 AI 就无法玩」，要求把举证方式改成「同一局面下 AI 的选择如何改变策略体验」，并同步三处措辞。
+
+**对照实验（tools/_ab-choose.mjs，同一颗种子 + 同一套规矩）**：构造 12 组「同一局面、只改他记得的事」（棋盘 = 六条全堵 / 只写两条；记忆 = 基线 / 记仇×2 / 漏过×2 / 高压）：
+- 兜底版本每次都取引擎权重第一条（B1 6 次全是「医务室的窗」、B2 6 次全是「走廊的通风口」），AI 版本给出 **3 条不同路线**，与兜底不一致 **8/12 组**；
+- 把「哪条规矩拦过他 / 漏过他」换一条，他就从窗改成墙或通风口（**2/5 组**）；
+- **12/12 带理由行**，理由均引用被改动的那条记忆；B2 里窗口已卡 2/4，AI 仍 6/6 选它（习性压过可行性）。
+
+**三处改动（已完成）**：
+1. `README.md`：旧段「关掉 AI 会发生什么（ablation）」→「同一局面，两种选择（对照实验）」，加 4 行对照表 + 上述数字 + 「这不是『没有 AI 就玩不了』……删掉 AI 你不会输，但你会少一个可以恨、可以骗、可以读懂的人」。
+2. 创作手记第 7 节（公开页 https://modelscope.cn/posts/438502 ）：原「对照实验……」段替换为三段（说明 / 12 组数字 / 不是没有 AI 就玩不了），ContentDraft PUT + 发布成功，编辑区 4,688 字符，公开页渲染含「8/12」「兜底」「同一局面，两种选择」；`/api/v1/articles/438502` 的 ContentMd 是异步缓存、短时滞后（draftHas812=true 而 md 尚未刷新），页面为准。
+3. 演示视频 A/B 卡重做：`tools/_cardab2.py` → `tools/card-ab.jpg`，标题「同一夜 · 同样六条规矩」、左「AI 开着 / 他走的是「放风区的墙」/ 因为：洗衣房那条规矩拦过他两次。」、右「兜底 · ?llm=0 / 他走的是「医务室的窗」/ 按权重取第一条，不看历史。」、底部「判定一次都没变……变的只是他从哪条路走」。整片重编码 `node tools/mkfilm2.mjs tools/demo-90.mp4 tools/segments.json` → 72.87s / 5,841,240 B。
+4. 创空间描述经查无「AI 不可替代」类表述（只写「判定归引擎，生成归 AI」），未改；源文档 `docs/创作手记.md` 第四节标题与 ablation 段同步改写。
+
+**上线与验证**：demo-90.mp4 上传创空间（commit 31）→ 2026-11-21 10:00 触发重新部署 → **10:04:47 Running**；`/static/demo-90.mp4` Range 206，Content-Range `bytes 0-1/5841240`、`public, max-age=86400`；`/play` 200 / gzip 51,487 B / ETag 未变；`/healthz` ok。
+**Git**：commit **7319af3**（README + docs）已 push `github.com:lxyovo111/paper-cage.git` main；视频与卡片在 tools/（仓库忽略），随创空间交付。
 
 ## 待办 / 可选
 - 玩法/难度/夜戏已上线，桌面+手机真机夜戏验收通过；建议用户亲自再玩一局确认难度手感（尤其第 4 夜起的一夜两步）
