@@ -1249,7 +1249,7 @@ const PARAMS = {
   obedienceFloor: 5,
   broadZonePenalty: 0.62,     // 「全区域」的规矩执行时要跑遍整座监狱 → 打六二折
   broadTimePenalty: 0.80,     // 「全时段」→ 打八折
-  catchBase: 0.10, catchObedience: 0.24, catchWarned: 0.24, catchFatigue: 0.0015,
+  catchBase: 0.20, catchObedience: 0.30, catchWarned: 0.08, catchFatigue: 0.0015,
   hostilityRule: 5, hostilityBlocked: 2, hostilityCaught: 8, hostilitySlip: 3,
   despairCaught: 10, despairBlocked: 3,
   nightStart: 21 * 60 + 50,   // 熄灯 21:50：他动手时刚好过 22:00，「入夜」类规矩才管得住
@@ -1487,7 +1487,7 @@ function predict(state, routeId) {
   const r = ROUTES.find(x => x.id === routeId);
   if (!r) return { ok:false, error:'没有这条路。' };
   state.prediction = routeId;
-  state.warned = true;   // 猜中了就是在他会走的那条路上多站了一班
+  // 只有猜中才有额外一班（见 simulateNight 的 warnedNow）；猜错只影响行动力，不白送抓捕率。
   return { ok:true, route:r };
 }
 
@@ -1831,11 +1831,19 @@ async function chooseHole(holes, state) {
     };
     const j = await ask({
       task: 'choose',
-      holes: pool.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '' })),
+      // open 是引擎算的「这条路没被任何规矩堵住」——决策输入，不是模型自己猜的
+      holes: pool.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, open: !!h.open, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '', blockedBy: h.blockedBy || '' })),
       memory,
     });
     const hit = holes.find((h) => h.id === (j && j.id));
     if (!hit) return { id: top.id, line: template(top), by: 'local', degraded: true };
+    // 规则层校验：有通的路时，他不该故意去撞已经堵死的路（报复心情除外——那是引擎按阈值收窄的池）。
+    // 模型偶尔会凭习性硬挑被堵的老路；这里纠正，避免「AI 开着反而更容易被关住」。
+    const openHoles = holes.filter((h) => h.open);
+    if (mood.kind !== 'revenge' && openHoles.length && !hit.open) {
+      const alt = openHoles[0];
+      return { id: alt.id, line: template(alt), by: 'local', corrected: true };
+    }
     const reason = (j && typeof j.reason === 'string') ? Array.from(j.reason.trim()).slice(0, 24).join('') : '';
     return { id: hit.id, reason, by: 'llm', line: template(hit) };
   } catch (e) {
@@ -3029,11 +3037,13 @@ async function askNight() {
     '<p class="hint">档案：' + esc(g.habit ? g.habit.line : '') + '</p>' +
     '<div class="chips">' + E.availableRoutes(g).map((r) => {
       const hole = holes.find((h) => h.id === r.id) || {};
-      const detail = hole.known
-        ? (hole.open ? '这条路是通的' : '卡在：' + (hole.blockedAt || '') + (hole.strength < 0.6 ? '（拦得不稳）' : ''))
-        : '没查过这条路';
+      // 玩家写的规矩是他自己的：哪条路被堵着、哪条没被堵，他应该能看见——否则「猜他走哪条」只能靠运气。
+      const blockedBy = hole.blockedBy || hole.blockedAt || '';
+      const detail = blockedBy
+        ? '堵在：' + blockedBy + (hole.known && hole.strength < 0.6 ? '（拦得不稳）' : '')
+        : (hole.known ? '这条路是通的' : '这条路没被规矩堵住');
       return '<div class="chip" data-k="pred" data-id="' + r.id + '"><div><div class="nm">' + r.name +
-        '</div><div class="in" style="' + (hole.known ? '' : 'opacity:.5') + '">' + detail + '</div></div></div>';
+        '</div><div class="in" style="' + (hole.known || hole.blockedAt ? '' : 'opacity:.5') + '">' + detail + '</div></div></div>';
     }).join('') + '</div>' +
     '<div class="row stack"><button class="btn ghost" data-k="interrogate">提审他 · 1 行动力</button>' +
     '<button class="btn ghost" data-k="patrol">加派夜巡 · 2 行动力</button></div>' +

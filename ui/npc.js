@@ -112,11 +112,19 @@ export async function chooseHole(holes, state) {
     };
     const j = await ask({
       task: 'choose',
-      holes: pool.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '' })),
+      // open 是引擎算的「这条路没被任何规矩堵住」——决策输入，不是模型自己猜的
+      holes: pool.slice(0, 6).map((h) => ({ id: h.id, name: h.name, intent: h.intent || '', known: !!h.known, open: !!h.open, depth: h.depth, total: h.total, blockedAt: h.blockedAt || '', blockedBy: h.blockedBy || '' })),
       memory,
     });
     const hit = holes.find((h) => h.id === (j && j.id));
     if (!hit) return { id: top.id, line: template(top), by: 'local', degraded: true };
+    // 规则层校验：有通的路时，他不该故意去撞已经堵死的路（报复心情除外——那是引擎按阈值收窄的池）。
+    // 模型偶尔会凭习性硬挑被堵的老路；这里纠正，避免「AI 开着反而更容易被关住」。
+    const openHoles = holes.filter((h) => h.open);
+    if (mood.kind !== 'revenge' && openHoles.length && !hit.open) {
+      const alt = openHoles[0];
+      return { id: alt.id, line: template(alt), by: 'local', corrected: true };
+    }
     const reason = (j && typeof j.reason === 'string') ? Array.from(j.reason.trim()).slice(0, 24).join('') : '';
     return { id: hit.id, reason, by: 'llm', line: template(hit) };
   } catch (e) {

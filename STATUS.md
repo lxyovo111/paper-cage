@@ -1,8 +1,8 @@
-# 《纸上牢笼》· 交付状态（2026-11-21 12:55）
+# 《纸上牢笼》· 交付状态（2026-11-21 21:10）
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 12:47 重新部署成功：200 / 159,318 字符（176,899 B，gzip 传输 54,908 B）/ 含进入兜底 + 首屏三段提示 + 心情阈值行 + 手机横屏版式；内容与本机 dist/index.html 逐字符一致；ETag W/"668328dcbf01f02af73f3016"，带 if-none-match → 304）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 21:05:21 重新部署成功：200 / 159,909 字符（177,848 B，gzip 传输 55,287 B）/ 含进入兜底 + 首屏三段提示 + 心情阈值行 + 手机横屏版式 + 难度调整后的 AI 换路；内容与本机 dist/index.html 逐字符一致；ETag W/"66b2560944256d21a956fca8"）
 - 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
@@ -142,6 +142,39 @@
 
 **Git**：本段代码与 STATUS 同批提交并 push（见 GitHub main 最新 commit）。
 
+## 难度调整：AI 会换路，预判不再是白送（2026-11-21 20:20–21:15，已上线）
+
+**问题**：玩家反馈「随便都能困住他」。拆开看是三个叠加的原因：
+1. 夜里的 AI 一直撞档案里那条习性路线，被玩家的窄规矩堵住也不换，等于送。
+2. `predict()` 在猜错的夜晚也会把 `state.warned` 置为 true，猜错反而白送 +24% 抓捕率。
+3. 预判面板只写「这条路是通的 / 没查过」，不写「被哪条规矩堵住」，玩家没有依据换路。
+
+**改法**：
+1. `game/engine.js`：`predict()` 只在猜中时设置 `warned`；猜错不再送抓捕加成。
+2. `ui/npc.js`：给 AI 的漏洞清单加 `open` 与 `blockedBy`（被哪条规矩堵住）；LLM 如果挑了一条被堵的路且清单里还有通的路，规则层把它纠正到第一条通的路（`corrected: true`）；只有所有路都被堵、或心情是报复时才允许撞。
+3. `app.py` 的 `_choose` prompt：清单标签改成「通 / 卡在「规矩原文」/ 他试过」，并硬性要求只要清单里有「通」的路就优先挑通的。
+4. `ui/app.js` 预判面板：有 `blockedBy` 显示「堵在：规矩原文」，强度不足 0.6 时补「拦得不稳」；没有则显示「这条路是通的 / 这条路没被规矩堵住」。
+5. 抓捕参数从早期 `.10/.24/.24` 调整为 **`catchBase .20 / catchObedience .30 / catchWarned .08`**；`?.llm=0` 的本地兜底同样走通的路，规则层纠正对 AI 和兜底一致生效。
+6. 修了一个字段错位：引擎 `blockedAt` 是路线步骤叙述，`blockedBy` 才是规矩原文；面板和 prompt 原来误用了 `blockedAt`。
+
+**平衡模拟（400 颗种子，7 夜封顶，数字为囚犯逃出率，越低说明玩家越强）**：
+
+| 玩家策略 | 逃出率 |
+| - | - |
+| 不写规矩，只按档案预判 | 39.5% |
+| 写窄规矩，只按习性预判 | 74.8% |
+| 写窄规矩，每天早上按报告补昨晚的路 | 60.3% |
+| 六条全时段全区域宽规矩，写完不再调整 | 93.0% |
+
+对照早期参数：封住习性路线的玩家从 86.5% 胜率降到约 25.2%，这是本次难度提升的主要来源；看报告补路明显更强（60.3% vs 74.8% 逃出率）；写宽规矩仍然必输（93.0% 逃出）。
+
+**验证**：
+- `node tools/bundle.mjs` → dist/index.html 177,848 B；桌面 `node tools/dist-test.mjs` settle（day7/rules6/nights6/errors=none）；竖屏 `node tools/mtest2.mjs` settle + LINES 4 无错。
+- AI 规则层纠正实测：`tools/_testguard.mjs` 让模型故意挑被堵的 window，夜里实际走 `wall`（第一条通的路）、`reason` 为空（本地纠正）。
+- 横屏 844×390：预判面板正确显示「堵在：夜里任何人不许进入医务室」；第二天 3 行报告不溢出（`tools/_land-night2.png`）。
+
+**上线**：上传 app.py（17,217 B）+ .upload/index.html（177,848 B）到创空间（36 提交）→ 2026-11-21 21:00 触发部署 → **21:05:21 Running**。线上验收：`/play` 200 / 159,909 字符 / 177,848 B / gzip 55,287 B / ETag W/"66b2560944256d21a956fca8"，与本机 dist 逐字符一致；`堵在`、`blockedBy`、`corrected` 等标记全在。线上 `choose` 冒烟：给 window（被堵）+ wall/vent（通）三条路，AI 返回 `{"ok":true,"id":"wall","reason":"放风时总抬头看天"}`（挑通的路且用上记忆）；`compile` 正常。
+
 ## 待办 / 可选
 - 玩法/难度/夜戏已上线，桌面+手机真机夜戏验收通过；建议用户亲自再玩一局确认难度手感（尤其第 4 夜起的一夜两步）
 - 音频听感验收：需要人耳确认音量配比（BGM 0.16/0.20，音效 0.35–0.65）是否合适，可再调
@@ -155,7 +188,7 @@
 - 重新打包：`node tools/bundle.mjs` → dist/index.html
 - 本地跑：`node server.mjs` → http://127.0.0.1:7861/dist/index.html
 - 无头回归：`node tools/dist-test.mjs`
-- 平衡模拟：`node tools/seedscan2.mjs`（120 局，反应式玩家；最新：失守72/账本37/铁壁7/记得4，逃逸 60%）；`node tools/seedscan.mjs`（静态六条，逃逸 84%）
+- 难度模拟：`node tools/_sweep3.mjs`（400 颗种子，多策略参数扫描；最新参数 b20o30w08：不写规矩 39.5% / 只看档案 74.8% / 看报告补路 60.3% / 静态六条 93.0% 逃出）
 - 视频重拼：`node tools/gen-segments.mjs && node tools/mkfilm2.mjs tools/demo-90.mp4 tools/segments.json`
 - 部署：`node tools/_upload-mdj.mjs "<绝对路径>"` 上传（只接受平铺文件）→ `node tools/_deploynow.mjs` 触发（settings → 重新部署 → 确认部署）→ `node tools/_watch-deploy2.mjs <旧DeployedTime>` 轮询到 Running（约 5–16 分钟）
 - 线上校验：`node tools/_verify-ab.mjs`（/play 头与标记、gzip、304、与本地 dist 逐字符比对）

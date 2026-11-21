@@ -299,11 +299,13 @@ async function askNight() {
     '<p class="hint">档案：' + esc(g.habit ? g.habit.line : '') + '</p>' +
     '<div class="chips">' + E.availableRoutes(g).map((r) => {
       const hole = holes.find((h) => h.id === r.id) || {};
-      const detail = hole.known
-        ? (hole.open ? '这条路是通的' : '卡在：' + (hole.blockedAt || '') + (hole.strength < 0.6 ? '（拦得不稳）' : ''))
-        : '没查过这条路';
+      // 玩家写的规矩是他自己的：哪条路被堵着、哪条没被堵，他应该能看见——否则「猜他走哪条」只能靠运气。
+      const blockedBy = hole.blockedBy || hole.blockedAt || '';
+      const detail = blockedBy
+        ? '堵在：' + blockedBy + (hole.known && hole.strength < 0.6 ? '（拦得不稳）' : '')
+        : (hole.known ? '这条路是通的' : '这条路没被规矩堵住');
       return '<div class="chip" data-k="pred" data-id="' + r.id + '"><div><div class="nm">' + r.name +
-        '</div><div class="in" style="' + (hole.known ? '' : 'opacity:.5') + '">' + detail + '</div></div></div>';
+        '</div><div class="in" style="' + (hole.known || hole.blockedAt ? '' : 'opacity:.5') + '">' + detail + '</div></div></div>';
     }).join('') + '</div>' +
     '<div class="row stack"><button class="btn ghost" data-k="interrogate">提审他 · 1 行动力</button>' +
     '<button class="btn ghost" data-k="patrol">加派夜巡 · 2 行动力</button></div>' +

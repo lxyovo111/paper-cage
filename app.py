@@ -183,10 +183,12 @@ def _choose(payload):
         tags = []
         if h.get("intent"):
             tags.append(str(h.get("intent")))
+        if h.get("open"):
+            tags.append("通")
+        elif h.get("blockedBy") or h.get("blockedAt"):
+            tags.append("卡在「" + str(h.get("blockedBy") or h.get("blockedAt")) + "」")
         if h.get("known"):
             tags.append("他试过")
-        if h.get("blockedAt"):
-            tags.append("卡在" + str(h.get("blockedAt")))
         rows.append("- id=%s 名字=%s%s" % (h.get("id"), h.get("name"),
                                           ("（" + "、".join(tags) + "）") if tags else ""))
     bits = []
@@ -226,10 +228,11 @@ def _choose(payload):
 
 要求：
 1. 只能从上面列出的 id 里挑一个。
-2. reason 必须来自【你记得的事】里的一条，写成一句具体的中文，不超过 18 个字；不要抽象、不要解释、不要用引号。
-3. 只说为什么挑这条，不要说「最可能」「最容易」这类空话。
-4. 如果【今晚的心情】是报复，reason 必须提到那条规矩；如果是懈怠，reason 要利用这一点。
-5. 心情是引擎按阈值给出的状态，不是你能选的——你只在它允许的路线里挑一条。
+2. 标着「通」的路是没有被任何规矩堵住的。只要清单里有「通」的路，就优先挑一条通的；只有所有路都被堵住，或者【今晚的心情】是报复时，才去挑被堵的路。
+3. reason 必须来自【你记得的事】里的一条，写成一句具体的中文，不超过 18 个字；不要抽象、不要解释、不要用引号。
+4. 只说为什么挑这条，不要说「最可能」「最容易」这类空话。
+5. 如果【今晚的心情】是报复，reason 必须提到那条规矩；如果是懈怠，reason 要利用这一点。
+6. 心情是引擎按阈值给出的状态，不是你能选的——你只在它允许的路线里挑一条。
 
 只输出 JSON：{"id":"路线id","reason":"……"}""" % (
         "\n".join(bits) or "（没有特别记得的事，只能凭直觉）", state_txt, mood_txt, "\n".join(rows))

@@ -30,7 +30,7 @@ export const PARAMS = {
   obedienceFloor: 5,
   broadZonePenalty: 0.62,     // 「全区域」的规矩执行时要跑遍整座监狱 → 打六二折
   broadTimePenalty: 0.80,     // 「全时段」→ 打八折
-  catchBase: 0.10, catchObedience: 0.24, catchWarned: 0.24, catchFatigue: 0.0015,
+  catchBase: 0.20, catchObedience: 0.30, catchWarned: 0.08, catchFatigue: 0.0015,
   hostilityRule: 5, hostilityBlocked: 2, hostilityCaught: 8, hostilitySlip: 3,
   despairCaught: 10, despairBlocked: 3,
   nightStart: 21 * 60 + 50,   // 熄灯 21:50：他动手时刚好过 22:00，「入夜」类规矩才管得住
@@ -268,7 +268,7 @@ export function predict(state, routeId) {
   const r = ROUTES.find(x => x.id === routeId);
   if (!r) return { ok:false, error:'没有这条路。' };
   state.prediction = routeId;
-  state.warned = true;   // 猜中了就是在他会走的那条路上多站了一班
+  // 只有猜中才有额外一班（见 simulateNight 的 warnedNow）；猜错只影响行动力，不白送抓捕率。
   return { ok:true, route:r };
 }
 
