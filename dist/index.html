@@ -3625,7 +3625,7 @@ function showReview() {
   q.push('<div class="qa"><b>② 哪条规矩一次也没用上？</b><p>' +
     (cold.length ? cold.map(function (s) { return '「' + esc(s.rule.text) + '」'; }).join('、') +
       '——他一次也没走到那条规矩管的地方。' :
-      '六条规矩都碰到过他的路线，没有一条是纯摆设。') + '</p></div>');
+      ((g.rules || []).length ? '你写下的 ' + (g.rules || []).length + ' 条规矩都碰到过他的路线，没有一条是纯摆设。' : '你一条规矩都没写。')) + '</p></div>');
   q.push('<div class="qa"><b>③ 你的预判准了几夜？</b><p>' +
     '七夜里猜中 ' + right + ' 夜。' +
     (risky.length ? '有 ' + risky.length + ' 夜里，他明明踩中了你的规矩，还是漏了过去——那是服从度在掉。' :
@@ -3634,7 +3634,7 @@ function showReview() {
     (worst && worst.leaked > worst.blocked
       ? '先改「' + esc(worst.rule.text) + '」：它被踩中了，却没拦住。写得再窄一点，或者换到他真正会停下的那道门。'
       : (cold.length
-        ? '把「' + esc(cold[0].rule.text) + '」换掉：它一次也没等到他。用这六条里的一条，去堵他真走过的那条路。'
+        ? '把「' + esc(cold[0].rule.text) + '」换掉：它一次也没等到他。用你写下的规矩里的一条，去堵他真走过的那条路。'
         : '结构已经咬合了。下次可以试着少写一条宽规矩，把省下的服从度留给一条更窄的边界规矩。')) + '</p></div>');
   const sheet = openSheet(
     '<h3>结 局 回 顾</h3>' +

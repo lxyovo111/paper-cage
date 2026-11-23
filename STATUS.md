@@ -1,6 +1,6 @@
-# 《纸上牢笼》· 交付状态（2026-11-23 20:10）
+# 《纸上牢笼》· 交付状态（2026-11-23 21:22）
 
-## 2026-11-23 规则可核对性改版（本地已完成，待上线）
+## 2026-11-23 规则可核对性改版（已上线）
 
 起因：真实试玩反馈「输入『入夜后，任何人不得离开自己的房间』，归档却显示限定三号牢房，第一夜报告又出现他进了储藏室」。核心问题是玩家写的规矩与引擎执行的判定不一致、且无法核对。
 
@@ -11,14 +11,18 @@
 **首回合引导**：第一夜可跳过三步提示纸条；不写成说明书。
 **宽严代价**：确认卡显示写下后的服从度变化与该规矩执行率，边界/宽/具体三类定性提示。
 **结局四问**：结算后可开「结局回顾」，回答哪条真拦住、哪条没用上、预判准了几夜、只能改一条改哪条。
-**创作手记**：docs/创作手记-模板版.md 已补 AI 三处调用链路、边界语义、行动依据与音效说明；线上文章 438502 尚未同步。
+**创作手记**：docs/创作手记-模板版.md 已补 AI 三处调用链路、边界语义、行动依据与音效说明；线上文章 438502 已通过 `PUT /api/v1/articles` 重写 `ContentDraft` 同步，公开页验证 `hasBad=false / hasBoundary=true / hasAI=true / hasAudio=true`。
 
-**已验证**：`tools/test-rule-boundary.mjs`（原话 → `boundary:"leave"`、`22:00–05:00 · 三号牢房 · 禁止离开 · 无例外`、holes 全 blocked、第一夜 blocked）；`tools/dist-test.mjs`（settle / 6 rules / no errors）；headless Edge 桌面与手机截图确认确认卡、行动依据、地图红框、代价提示、引导纸条、结局回顾。dist 202,733 B。
-**部署阻塞**：本机两个 headless Edge 的魔搭登录态失效；`tools/.ms-key` 只有读权限，Git push 与 OpenAPI 均被拒（`token does not support repository operations` / `OperationNotAllowed`）。需要用户在自动化浏览器里扫码登录一次，或提供一个「写权限」访问令牌，然后执行 `tools/upload3.mjs` + `tools/redeploy6.mjs`。
+**已验证**：`tools/test-rule-boundary.mjs`（原话 → `boundary:"leave"`、`22:00–05:00 · 三号牢房 · 禁止离开 · 无例外`、holes 全 blocked、第一夜 blocked）；`tools/dist-test.mjs`（settle / 6 rules / no errors）；headless Edge 桌面与手机截图确认确认卡、行动依据、地图红框、代价提示、引导纸条、结局回顾。最终 dist 202,842 B。
+
+**线上复测（2026-11-23 21:10 最终版）**：`/play` 200（180,957 字符）含「行动依据」「第一次当监狱长」；`tools/online-full.mjs` 用线上 iframe 完整跑一局（seed 8 / llm=1 / 7 夜），确认卡显示对象/时间/地点/限制与三条提醒、行动依据逐步显示命中第①条及执行率、报告行可点地图红框、结算 `#review-btn` 四问齐全、`errors=[]`；`tools/online-quick.mjs` 另测首回合纸条出现/可跳过、AI 校准后确认卡显示「AI 已校准」并保留 `22:00–05:00 · 医务室 · 禁止进入`。
+**A/B/C/D 对照（2026-11-23 21:20，线上同种子 8 / 各 4 夜）**：A = AI 开 + 三条规矩（医务室禁止进入 / 放风区墙禁止碰 / 储藏室麻绳禁止取）→ 第1夜「狱警的钥匙」被抓，第2–4夜「食堂的后门」；B = AI 关 + 同三条规矩 → 连续四夜「狱警的钥匙」，第4夜逃出；C = AI 开、无规矩 → 连续四夜「医务室的窗」；D = AI 关、无规矩 → 同样四夜「医务室的窗」。结论：判定与结局完全由引擎算，AI 开关不改变判定；但 A 组第1夜被抓后换路、B 组不换，说明跨回合记忆/理由参与了选路；C/D 路线一致，AI 只多出理由句。
+
+**部署（2026-11-23 12:19–12:33）**：在用户登录的 9225 Edge 里用 `tools/upload925.mjs` 上传 `.upload/index.html`（202,786 B），`tools/deploy925b.mjs` 点「重新部署 → 确认部署」，后台 `tools/wait-deploy2.mjs` 等到 `/play` 200（180,878 字符）含新标记，耗时 820s。之后又修了结局回顾里写死的「六条规矩」（只有 1 条规矩时会说错），重新打包 202,842 B，21:10 二次部署成功（`/play` 180,957 字符），`tools/online-full.mjs` 复测：一局 7 夜 settle、结局回顾显示「你写下的 1 条规矩…」、`errors=[]`。`tools/.ms-key` 仍是只读令牌，Git push 与 OpenAPI 均被拒（`token does not support repository operations` / `OperationNotAllowed`），因此部署只走浏览器 UI；同版本已先 push 到 GitHub `6ba6611`。
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-21 21:05:21 重新部署成功：200 / 159,909 字符（177,848 B，gzip 传输 55,287 B）/ 含进入兜底 + 首屏三段提示 + 心情阈值行 + 手机横屏版式 + 难度调整后的 AI 换路；内容与本机 dist/index.html 逐字符一致；ETag W/"66b2560944256d21a956fca8"）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-23 21:10 重新部署成功：200 / 180,957 字符，含规则边界语义、确认卡、行动依据、地图联动、首回合引导、宽严代价、结局回顾；本机 dist/index.html 202,842 B 打包产物；部署路径见上节）
 - 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
