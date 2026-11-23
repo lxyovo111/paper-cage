@@ -130,10 +130,28 @@ def _norm_lang(L, text):
         keep = [x for x in acts if x in narrowed]
         acts = keep or [x for x in narrowed if x in ACT_IDS]
 
+    # 边界语义不能只交给模型判断：模型漏掉「离开」时，前端会把这条规矩退化成
+    # 「在房间里禁止移动」，玩家当场就会发现范围被缩窄。文本检测作为兜底，模型结果只做确认。
+    boundary = L.get("boundary")
+    if boundary not in ("leave", "enter"):
+        boundary = None
+    if any(k in text for k in ("离开", "走出", "出房", "出门", "出去")):
+        boundary = "leave"
+    elif any(k in text for k in ("进入", "走进", "回房", "回到")):
+        boundary = "enter"
+    if boundary == "leave" and any(k in text for k in ("自己的房间", "自己的牢房", "他的房间", "他的牢房")):
+        # 本局只有一名在押囚犯，说「自己的房间」就是三号牢房；不要悄悄扩成所有牢房。
+        zones = ["cell3"]
+    if boundary and "MOVE" not in acts:
+        acts.insert(0, "MOVE")
+    acts = list(dict.fromkeys(acts))
+    subject = "any" if any(k in text for k in ("任何人", "所有人", "每个人", "谁都不", "无论谁")) else "target"
+
     item = L.get("item")
     item = item if item in ("iron", "sheet", "rope", "knife", "key") else None
     return {"window": {"from": a, "to": b}, "zones": zones,
-            "actions": acts, "escort": bool(L.get("escort")), "item": item}
+            "actions": acts, "escort": bool(L.get("escort")), "item": item,
+            "boundary": boundary, "subject": subject}
 
 
 def _compile(payload):
@@ -146,10 +164,21 @@ def _compile(payload):
 可选物品（没有就 null）：%s
 
 时间用「当天的分钟数」表示：夜里 = 1320 到 300（跨夜），全时段 = 0 到 1439。
-from 必须小于 to，绝对不要输出 from 等于 to。
+允许跨夜（from > to），但绝对不要输出 from 等于 to。
+
+边界字段 boundary（很重要）：
+- 句子里是「离开房间 / 走出 / 出房 / 出门 / 出去」→ "leave"
+- 是「进入房间 / 走进 / 回房 / 回到」→ "enter"
+- 都不是 → null
+边界规矩判的是「跨过门槛」的那一刻；不要把它写成「在房间里禁止移动」。
+
+对象字段 subject：
+- 句子里出现「任何人 / 所有人 / 每个人 / 谁都不 / 无论谁」→ "any"
+- 否则 → "target"
+本局只有一名在押囚犯；狱警不是可被规矩约束的对象。
 
 只输出 JSON，不要解释：
-{"lang":{"window":{"from":分钟,"to":分钟},"zones":"ALL"或["区域id"],"actions":["动作id"],"escort":true/false,"item":null}}
+{"lang":{"window":{"from":分钟,"to":分钟},"zones":"ALL"或["区域id"],"actions":["动作id"],"escort":true/false,"item":null,"boundary":"leave/enter/null","subject":"target/any"}}
 
 一句话没提到的区域不要擅自扩大，宁可窄。""" % (text, ROOM_CAT, ACT_CAT, ITEM_CAT)
     raw = _chat([

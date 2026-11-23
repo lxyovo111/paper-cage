@@ -110,10 +110,16 @@ function report(st) {
   let y = 792;
   for (const r of lines.slice(0, 5)) {
     const parts = wrap(r.text, 36);
-    rows.push(T(252, y, r.t || '', { size: 12, fill: C.MUTED, tracking: 0.5 }));
+    const rowTop = y - 18;
+    const rowH = 22 * Math.min(2, parts.length) + 16;
+    const rowParts = [T(252, y, r.t || '', { size: 12, fill: C.MUTED, tracking: 0.5 })];
     parts.slice(0, 2).forEach(function (p, i) {
-      rows.push(T(306, y + i * 22, p, { size: 15.5, font: KAI, fill: i ? C.MUTED : C.INK2 }));
+      rowParts.push(T(306, y + i * 22, p, { size: 15.5, font: KAI, fill: i ? C.MUTED : C.INK2 }));
     });
+    // data-room 来自昨夜 trace；点一行，地图上就亮一下那个房间。
+    rows.push('<g data-act="locate" data-room="' + (r.room || '') + '" style="cursor:pointer">' +
+      '<rect x="246" y="' + rowTop + '" width="1120" height="' + rowH + '" fill="#000" opacity="0.001"/>' +
+      rowParts.join('') + '</g>');
     y += 22 * Math.min(2, parts.length) + 10;
   }
   const day = st.day || 1;
@@ -121,6 +127,10 @@ function report(st) {
   <g id="report">
     <line x1="132" y1="752" x2="1468" y2="752" stroke="${C.INK2}" stroke-width="0.8" opacity="0.4"/>
     ${T(132, 776, '巡 查 报 告', { size: 13, fill: C.INK, tracking: 4 })}
+    <g data-act="why" style="cursor:pointer">
+      <rect x="1352" y="760" width="116" height="24" fill="#000" opacity="0.001"/>
+      ${T(1468, 776, '行动依据 ▸', { size: 10.5, anchor: 'end', fill: C.WARM, tracking: 1 })}
+    </g>
     ${T(132, 924, '值 班 人', { size: 10, fill: C.MUT2, tracking: 3 })}
     ${T(196, 924, '李', { size: 15, font: KAI, fill: C.INK2 })}
     <line x1="216" y1="927" x2="330" y2="927" stroke="${C.INK2}" stroke-width="0.7" opacity="0.4"/>

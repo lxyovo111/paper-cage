@@ -1,0 +1,4 @@
+import * as E from 'file:///C:/Users/lcj/Desktop/tap/six-rules/game/engine.js';
+function run(seed, plan){const g=E.createGame(seed); let warned=false; for(let n=0;n<7&&!g.escaped;n++){ if(plan && !warned){E.writeRule(g,plan);warned=true;} const holes=E.enumerateHoles(g); const pick=holes[0]; E.simulateNight(g,{routeId:pick.id}); } return {esc:g.escaped,title:E.settle(g).title,day:g.nights.length,ob:Math.round(g.obedience),host:Math.round(g.hostility)};}
+for(const plan of [null,'入夜后，任何人不得离开自己的房间。','夜里禁止进入医务室。']){const out=[]; for(let s=1;s<=300;s++) out.push(run(s,plan)); const dist={}; out.forEach(o=>{const k=o.esc?'escape':o.title; dist[k]=(dist[k]||0)+1;}); console.log(plan||'no rule',JSON.stringify(dist),'escRate',out.filter(o=>o.esc).length/out.length);}
+// one boundary rule + 5 useful rules, still see escape rate

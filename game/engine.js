@@ -143,12 +143,42 @@ function parseTime(text) {
 }
 
 export function noteOf(lang) {
+  const limit = lang.boundary === 'leave' ? '禁止离开'
+    : lang.boundary === 'enter' ? '禁止进入'
+    : lang.actions.map(a => '禁止' + ACTIONS[a]).join(' / ');
   return [
     (lang.window.from === 0 && lang.window.to === 1439) ? '全时段' : fmt(lang.window.from) + '–' + fmt(lang.window.to),
     lang.zones === 'ALL' ? '全区域' : lang.zones.map(z => ROOMS[z].name).join('、'),
-    lang.actions.map(a => '禁止' + ACTIONS[a]).join(' / '),
+    limit,
     lang.escort ? '需两人同行' : '无例外',
   ].join(' · ');
+}
+
+// 给玩家看的「系统理解」：不是营销文案，是把判定条拆成能核对的人话。
+// 无法准确表达的部分必须在这里说出来，不能让玩家以为「任何人」管住了狱警。
+export function explainLang(lang) {
+  const L = lang || {};
+  const win = L.window || { from: 0, to: 1439 };
+  const fullTime = win.from === 0 && win.to === 1439;
+  const time = fullTime ? '全时段（00:00–24:00）'
+    : fmt(win.from) + ' 至 ' + fmt(win.to) + (win.from > win.to ? '（跨夜）' : '');
+  const place = L.zones === 'ALL' ? '全区域（整座监狱）'
+    : (L.zones || []).map(z => ROOMS[z] && ROOMS[z].name).filter(Boolean).join('、');
+  let limit;
+  if (L.boundary === 'leave') limit = '不得离开' + (L.zones === 'ALL' ? '任何房间' : place);
+  else if (L.boundary === 'enter') limit = '不得进入' + place;
+  else limit = (L.actions || []).map(a => '禁止' + (ACTIONS[a] || a)).join(' / ');
+  const subject = L.subject === 'any'
+    ? '在押囚犯（本局唯一）；「任何人」不包含狱警'
+    : '在押囚犯（本局唯一）';
+  const notes = [];
+  if (L.subject === 'any') notes.push('本局只有一名在押囚犯。「任何人」不会把狱警列为被约束对象。');
+  if (L.boundary === 'leave' && Array.isArray(L.zones) && L.zones.includes('cell3')) {
+    notes.push('「自己的房间」只指他本人的三号牢房，不是所有牢房。');
+  }
+  if (L.boundary) notes.push('这是边界判定：只有跨过门槛时才算，待在房间里不会触发。');
+  if (L.zones === 'ALL') notes.push('全区域规矩执行率较低，写宽了狱警不会认真照办。');
+  return { subject, time, place, limit, notes };
 }
 
 // 用外部（LLM）编译出的 lang 造一条规矩，判定条由引擎重算——语言可以生成，语义必须校验
@@ -159,9 +189,12 @@ export function ruleFromLang(text, lang) {
     actions: lang.actions.filter(a => ACTIONS[a]),
     escort: !!lang.escort,
     item: ITEM_WORDS.some(([, it]) => it === lang.item) ? lang.item : null,
+    boundary: lang.boundary === 'leave' || lang.boundary === 'enter' ? lang.boundary : null,
+    subject: lang.subject === 'any' ? 'any' : 'target',
   };
   if (!norm.actions.length) norm.actions = ['MOVE'];
   if (norm.zones !== 'ALL' && !norm.zones.length) norm.zones = 'ALL';
+  if (norm.boundary && !norm.actions.includes('MOVE')) norm.actions.unshift('MOVE');
   return { ok: true, lang: norm, note: noteOf(norm) };
 }
 
@@ -177,16 +210,40 @@ export function compileRule(text) {
   const escort = /两人同行|同行|两个人|两人一起|结伴|陪/.test(src);
   const obj = (OBJECT_WORDS.find(([re]) => re.test(src)) || [])[1] || null;
   const item = (ITEM_WORDS.find(([re]) => re.test(src)) || [])[1] || obj || null;
+  // 边界语义：「离开自己的房间」和「待在房间里」是两条完全不同的规矩。
+  // 没有 boundary 时，引擎只能把「离开」错当成「在房间里不许动」。
+  const boundary = /(离开|走出|出房|出门|出去)/.test(src) ? 'leave'
+    : /(进入|走进|回房|回到)/.test(src) ? 'enter' : null;
+  const subject = /(任何人|所有人|每个人|谁都不|无论谁|人人都)/.test(src) ? 'any' : 'target';
   // 提到具体目标物时，「碰」就意味着取、撬、爬都算
   if (obj) actions = ['TAKE', 'BREAK', 'CLIMB'].concat(actions.filter(a => a !== 'MOVE'));
-  const lang = { window, zones, actions, escort, item };
+  if (boundary && !actions.includes('MOVE')) actions.unshift('MOVE');
+  actions = [...new Set(actions)];
+  const lang = { window, zones, actions, escort, item, boundary, subject };
   const note = noteOf(lang);
   return { ok:true, rule:{ text:src, lang, note, leaks:0, broken:false }, note };
 }
 
-export function ruleBlocks(rule, step, t) {
+export function ruleBlocks(rule, step, t, prevRoom) {
   if (!inWindow(rule, t)) return false;
-  const { zones, actions, item } = rule.lang;
+  const { zones, actions, item, boundary } = rule.lang;
+  // 边界规矩：判的是「跨过门槛」这一步，而不是「在房间里做了什么」。
+  // 例：「不得离开自己的房间」= 上一个房间在区域内、这一步要出去。
+  // 这一步即使动作是取物/破坏，也算跨门；所以 boundary 不走 actions 过滤。
+  if (boundary) {
+    const prev = prevRoom || null;
+    if (boundary === 'leave') {
+      if (!prev) return false;
+      if (zones === 'ALL') { if (step.room === prev) return false; }
+      else { if (!zones.includes(prev) || zones.includes(step.room)) return false; }
+    } else {
+      if (!prev) return false;
+      if (zones === 'ALL') { if (step.room === prev) return false; }
+      else { if (zones.includes(prev) || !zones.includes(step.room)) return false; }
+    }
+    if (item && item !== step.item) return false;
+    return true;
+  }
   if (zones !== 'ALL' && !zones.includes(step.room)) return false;
   if (!actions.includes(step.act)) return false;
   if (item && item !== step.item) return false;
@@ -199,6 +256,9 @@ export function ruleStrength(state, rule) {
   const { zones, window } = rule.lang;
   const broad = zones === 'ALL' || (window.from === 0 && window.to === 1439);
   let p = broad ? 0.55 : 1.0;
+  // 边界规矩靠狱警守门，不靠牢房里的人自觉：守住门口比在房间里巡查更难。
+  // 没有这个折扣，「不许离开自己的房间」会变成一条锁死所有路线的必胜规矩。
+  if (rule.lang.boundary) p *= 0.62;
   if (state.obedience < 45) p *= 0.55 + 0.45 * (state.obedience / 45);   // 服从度垮了，纸上的规矩就没人执行
   if (state.obedience < 40 && broad) p *= 0.5;   // 阈值：服从度跌破 40，大而空的规矩基本没人去巡（写得具体的还能执行）
   if (state.blackout) p *= 0.70;
@@ -308,12 +368,15 @@ export function enumerateHoles(state) {
   const owned = new Set(state.prisoner.items || []);
   for (const route of availableRoutes(state)) {
     let t = PARAMS.nightStart, depth = 0, blockedAt = null, blockedBy = null, blockedRule = null, weakest = 1;
+    let prevRoom = state.prisoner.room;
     for (const step of route.steps) {
       t += PARAMS.stepMinutes;
       // 他口袋里已有的东西不用再去拿一次：这一步对他不构成新的风险
+      // 也不要把 prevRoom 改成那个房间：他并没有真的走过去。
       if (step.act === 'TAKE' && owned.has(step.item)) { depth++; continue; }
-      const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t) || ruleBlocks(r, step, t));
+      const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t, prevRoom) || ruleBlocks(r, step, t, prevRoom));
       if (blk) { blockedAt = step.label; blockedBy = blk.text; blockedRule = blk.id; weakest = ruleStrength(state, blk); break; }
+      prevRoom = step.room;
       depth++;
     }
     // 阈值行为进排序：被记仇那条规矩堵住的路最优先（兜底也按这个顺序取第一条），
@@ -337,6 +400,7 @@ export function enumerateHoles(state) {
 export function simulateNight(state, choice = {}) {
   const rng = state.rng;
   const events = [];
+  const trace = [];
   const route = availableRoutes(state).find(r => r.id === choice.routeId) || ROUTES[1];
   const mood = moodOf(state);   // 入夜这一刻的心情；夜里涨的敌意留到下一夜
   const wasKnown = !!(state.intel && state.intel[route.id]);
@@ -369,39 +433,60 @@ export function simulateNight(state, choice = {}) {
 
   let lastRoom = null;
   let lastBlk = null;
+  const startRoom = state.prisoner.room;
+  let prevRoom = startRoom;
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
+    const fromRoom = prevRoom;
+    const tr = { n: i + 1, from: fromRoom, room: step.room, act: step.act, label: step.label, verdict: 'uncovered' };
     t += PARAMS.stepMinutes + Math.floor(rng() * 12);
+    tr.t = fmt(t);
     // 上一夜已经拿到的东西还在口袋里：这一步不用再冒险
+    // 也不要更新 prevRoom：他并没有真的走到那个房间。
     if (step.act === 'TAKE' && carried.has(step.item)) {
       push(t, 'note', '他摸了摸口袋里的' + (ITEM_NAMES[step.item] || '东西') + '——这一步他早就备好了。');
+      tr.verdict = 'prepared';
+      trace.push(tr);
       state.progress = { routeId: route.id, done: done + i + 1 };
       if (done + i + 1 === route.steps.length && state.day >= PARAMS.escapeEarliestNight) {
         outcome = 'escape'; push(t, 'escape', '他从' + route.name + '出去了。');
       }
       continue;
     }
-    if (step.room !== lastRoom) push(t, 'move', '他' + (step.room === 'corridor' ? '进了走廊' : '进了' + ROOMS[step.room].name) + '。');
-    lastRoom = step.room;
 
-    const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t)) ||
-                state.rules.find(r => ruleBlocks(r, step, t));
+    // 先判「这一步走不走得过去」，再播报「他进了哪个房间」。
+    // 否则会出现「他进了储藏室」后面紧跟「他被拦在门口」这种自相矛盾的报告。
+    const blk = state.rules.find(r => ruleBlocks(r, { ...step, act:'MOVE' }, t, prevRoom)) ||
+                state.rules.find(r => ruleBlocks(r, step, t, prevRoom));
     if (blk) {
       lastBlk = blk;
       state.grudge[blk.id] = (state.grudge[blk.id] || 0) + 1;
       blk.wear = (blk.wear || 0) + 1;
       const strength = ruleStrength(state, blk);
-      if (rng() < strength) {
+      const rolled = rng();
+      tr.ruleId = blk.id; tr.ruleText = blk.text; tr.chance = strength; tr.rolled = rolled;
+      if (rolled < strength) {
         const brave = state.hostility >= 70 || state.despair >= 75;
         const revengeHit = mood.kind === 'revenge' && mood.rule && blk.id === mood.rule.id;
-        push(t, 'block', (revengeHit ? '他明知道这条规矩在，还是去撞了一次'
-          : brave ? '他在门口停住了' : '他在门口停了一会儿，回身走了') + '：「' + blk.text + '」。', { rule:blk.id });
+        const from = ROOMS[prevRoom] ? ROOMS[prevRoom].name : '';
+        const to = ROOMS[step.room] ? ROOMS[step.room].name : '';
+        const cross = prevRoom && prevRoom !== step.room ? '他想从「' + from + '」去「' + to + '」，' : '';
+        push(t, 'block', cross + (revengeHit ? '明知道这条规矩在，还是去撞了一次'
+          : brave ? '在门口停住了' : '在门口停了一会儿，回身走了') + '：「' + blk.text + '」。',
+          { rule:blk.id, from:prevRoom, to:step.room });
+        tr.verdict = 'blocked';
+        trace.push(tr);
         outcome = i === 0 ? 'blocked' : 'partial';
         break;
       }
       blk.leaks += 1;
+      tr.verdict = 'leaked';
       push(t, 'leak', '他从规矩的缝里过去了——「' + blk.text + '」没拦住。', { rule:blk.id });
     }
+
+    if (step.room !== lastRoom) push(t, 'move', '他' + (step.room === 'corridor' ? '进了走廊' : '进了' + ROOMS[step.room].name) + '。');
+    lastRoom = step.room;
+    prevRoom = step.room;
 
     if (!state.blackout) {
       const warnedNow = state.warned || state.prediction === route.id;
@@ -411,6 +496,8 @@ export function simulateNight(state, choice = {}) {
         const blind = state.obedience < 40;
         push(t, 'catch', blind ? '手电的光扫过来。狱警看了他一眼，把光挪开了。' : '手电筒的光扫过来。狱警抓住了他的胳膊。');
         outcome = blind ? 'slip' : 'caught';
+        tr.caught = true; tr.catchChance = cp; tr.blind = blind;
+        trace.push(tr);
         if (!blind) { carried.clear(); state.progress = null; }
         break;
       }
@@ -418,7 +505,9 @@ export function simulateNight(state, choice = {}) {
 
     if (step.act === 'TAKE') carried.add(step.item);
     push(t, 'done', '他' + step.label + '。');
-    state.progress = { routeId: route.id, done: done + i + 1 };
+    if (!tr.ruleId) tr.verdict = 'uncovered';
+    trace.push(tr);
+    state.progress = { routeId: route.id, done: done + i + 1, at:step.room, from:fromRoom };
     if (done + i + 1 === route.steps.length && state.day >= PARAMS.escapeEarliestNight) {
       outcome = 'escape'; push(t, 'escape', '他从' + route.name + '出去了。');
     }
@@ -428,7 +517,8 @@ export function simulateNight(state, choice = {}) {
   const night = state.day;
   state.prisoner.items = [...carried];
   state.tutorialPending = false;
-  state.nights.push({ night, routeId:route.id, outcome, events:events.slice() });
+  state.nights.push({ night, routeId:route.id, routeName:route.name, routeTotal:route.steps.length,
+    outcome, events:events.slice(), trace:trace.slice(), startRoom });
 
   if (outcome === 'escape') { state.escaped = true; state.outcome = 'escape'; }
   else {
@@ -448,6 +538,8 @@ export function simulateNight(state, choice = {}) {
   }
 
   const right = state.prediction === route.id;
+  const rec = state.nights[state.nights.length - 1];
+  if (rec) rec.predictedRight = right;
   if (right) state.ap = Math.min(PARAMS.apMax, PARAMS.apPerDay + 1);
   else state.ap = PARAMS.apPerDay;
   state.warned = false;   // 夜巡用完即止

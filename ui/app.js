@@ -16,6 +16,7 @@ const SPEED = Math.max(0.02, Math.min(4, +(new URLSearchParams(location.search).
 const wait = (ms) => sleep(ms * SPEED);
 
 let g = null, view = null, busy = false, wroteToday = false;
+let coachSeen = false;
 // 给评审看的一行账：这一局 AI 出了多少次手、其中多少次真的生效（失败就是降级成规则）
 let aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
 
@@ -146,14 +147,41 @@ function showCover() {
   paint();
 }
 
+// 第一次当监狱长：一张可跳过的小纸条，不挡地图、不挡操作。
+function hideCoach() {
+  const el = document.getElementById('coach');
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+function showCoach() {
+  if (coachSeen || !g || g.day !== 1 || g.rules.length) return;
+  coachSeen = true;
+  const d = document.createElement('div');
+  d.id = 'coach';
+  d.innerHTML = '<div class="coach-t">第 一 次 当 监 狱 长</div>' +
+    '<div class="coach-b">① 点一条规矩空行，写一句人话。<br>' +
+    '② 核对判定条上的时间、地点、限制，再点「写下」。<br>' +
+    '③ 按右下角的红章「入夜」。</div>' +
+    '<div class="coach-r"><button class="btn ghost" data-k="coach-skip">跳过引导</button>' +
+    '<button class="btn primary" data-k="coach-ok">知道了</button></div>';
+  d.addEventListener('click', function (ev) {
+    const k = ev.target && ev.target.dataset && ev.target.dataset.k;
+    if (k === 'coach-skip' || k === 'coach-ok') hideCoach();
+  });
+  ov.appendChild(d);
+}
+
 function newGame() {
   const m = /[?&]seed=(\d+)/.exec(location.search);
   g = E.createGame(m ? +m[1] : (Date.now() % 90000) + 1000);
   view = { phase:'day', day:1, ap:3, apMax:3, obedience:100, hostility:30, rules:[], report:[], path:null, tokens:null };
   wroteToday = false;
+  const rb = document.getElementById('review-btn');
+  if (rb && rb.parentNode) rb.parentNode.removeChild(rb);
   aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
   dayBriefing();
   paint();
+  hideCoach();
+  setTimeout(showCoach, 900);
   if (g.day === 6) askSick();
 }
 
@@ -184,6 +212,12 @@ function dayBriefing() {
   else if (d === 6) lines.push({ t:'15:00', text: E.DAY_EVENTS[6].text });
   else if (d !== 1) lines.push({ t:'', text:'第 ' + CN[d] + ' 天。他今天话少。' });
   view.report = lines.slice(0, 4);
+  // 报告和地图联动：把昨夜 trace 里的房间挂到前两行，点报告就能在地图上看见那个房间。
+  if (last && last.trace && last.trace.length) {
+    view.report.forEach(function (line, i) {
+      if (i < 2) line.room = last.trace[Math.min(i, last.trace.length - 1)].room;
+    });
+  }
 }
 
 // ---------- 写规矩 ----------
@@ -195,6 +229,7 @@ const EXAMPLES = [
 
 async function askWrite() {
   if (busy) return;
+  hideCoach();
   if (g.rules.length >= E.PARAMS.rulesMax) return toast('六条规矩已经写满了。');
   if (g.ap < 1) return toast('今天的行动力用完了。');
   const sheet = openSheet(
@@ -220,77 +255,203 @@ async function askWrite() {
   async function doCompile() {
     const text = ta.value.trim();
     if (text.length < 4) return toast('再写长一点。');
-    // 先出确定性的判定条（规则引擎，0ms），AI 随后在后台核对一遍——不挡玩家
+    // 先出确定性的判定条（规则引擎，0ms），AI 随后在后台核对一遍——不挡玩家。
+    // 关键：这是「预览」。玩家若先按下「写下」，就锁定预览这一版；AI 晚到也不许再改。
     let local;
     try { local = E.compileRule(text); } catch (err) { local = { ok: false, error: '这句判不了。' }; }
     if (!local.ok) return toast(local.error || '这句判不了。');
     audio.sfx('pen');
-    const idx = g.rules.length;
-    showVerdict(sheet, text, local, llmOn);
+    sheet.__locked = false;
+    showVerdict(sheet, text, local, { pending: llmOn, calibrated: false });
     compileSmart(text).then(function (r) {
-      if (!r || !r.ok || r.by !== 'llm') return;
-      // 浮层还开着：直接换判定条 + AI 标签
-      const nEl = sheet.querySelector('.verdict .n');
-      if (nEl && document.body.contains(sheet)) {
-        nEl.innerHTML = esc(r.note) + '<span class="ai-tag">AI 校准</span>';
-        sheet.__result = r;
+      if (!r || !r.ok) return;
+      if (sheet.__locked) return;                 // 玩家已经确认过预览版：不再改写
+      if (!document.body.contains(sheet)) return; // 浮层已关：不再事后改册子里的规矩
+      if (r.by !== 'llm') {
         const pend = sheet.querySelector('.ai-pend');
-        if (pend) pend.remove();
+        if (pend) pend.textContent = 'AI 未返回，按本地判定执行。';
         return;
       }
-      // 玩家已经写下去了：规矩已经进册，把它的判定条就地更新
-      const rule = g.rules[idx];
-      if (rule && rule.text === text) {
-        rule.lang = r.rule ? r.rule.lang : rule.lang;
-        rule.note = r.note;
-        if (view.phase === 'day' && !busy) { syncView(); paint(); }
-      }
-    }).catch(function () {});
+      // AI 先回来：用校准后的判定条替换预览，并明确要求玩家再确认一次
+      showVerdict(sheet, text, r, { pending: false, calibrated: true });
+    }).catch(function () {
+      const pend = sheet && sheet.querySelector && sheet.querySelector('.ai-pend');
+      if (pend) pend.textContent = 'AI 未返回，按本地判定执行。';
+    });
   }
 }
 
-function showVerdict(sheet, text, r, pending) {
+function showVerdict(sheet, text, r, opts) {
+  opts = opts || {};
   sheet.__result = r;
   audio.sfx('paper');
+  const lang = r.rule ? r.rule.lang : r.lang;
+  const ex = E.explainLang(lang);
+  const tag = opts.calibrated ? '<span class="ai-tag">AI 校准</span>' : '<span class="vtag">本地判定</span>';
+  const status = opts.calibrated
+    ? 'AI 已校准 · 请确认这一版'
+    : (opts.pending ? '本地判定 · 预览（AI 正在核对）' : '本地判定');
   sheet.innerHTML =
     '<h3>归 档 完 毕</h3>' +
     '<p class="sub">你的话被译成了一条能执行的判定</p>' +
     '<div class="verdict"><div class="q">' + esc(text) + '</div>' +
-    '<div class="n">' + esc(r.note) + '</div>' +
-    (pending ? '<div class="ai-pend">AI 正在核对这条规矩的判定…</div>' : '') + '</div>' +
+    '<div class="n">' + esc(r.note) + tag + '</div>' +
+    '<div class="vfields">' +
+      '<div class="vrow"><span>对象</span><b>' + esc(ex.subject) + '</b></div>' +
+      '<div class="vrow"><span>时间</span><b>' + esc(ex.time) + '</b></div>' +
+      '<div class="vrow"><span>地点</span><b>' + esc(ex.place) + '</b></div>' +
+      '<div class="vrow"><span>限制</span><b>' + esc(ex.limit) + '</b></div>' +
+    '</div>' +
+    ex.notes.map((n) => '<div class="vwarn">' + esc(n) + '</div>').join('') +
+    (opts.pending ? '<div class="ai-pend">AI 正在核对这条规矩的判定…（现在写下 = 锁定预览版）</div>' : '') +
+    '</div>' +
     '<p class="hint" style="margin-top:14px">' + costHint(r) + '</p>' +
     '<div class="row"><button class="btn ghost" data-k="back">改 写</button>' +
     '<button class="btn primary" data-k="ok">写 下</button></div>';
   sheet.querySelector('[data-k="back"]').addEventListener('click', () => { closeSheet(); askWrite(); });
   sheet.querySelector('[data-k="ok"]').addEventListener('click', async () => {
     const rr = sheet.__result || r;
+    sheet.__locked = true;   // 锁在玩家眼前这一版：AI 晚到不得再改
     const w = E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note });
-    if (!w.ok) return toast(w.error);
+    if (!w.ok) { sheet.__locked = false; return toast(w.error); }
     audio.sfx('stamp');
     wroteToday = true;
     closeSheet();
     syncView();
     const last = g.rules[g.rules.length - 1];
+    const lex = E.explainLang(last.lang);
     view.report = [
       { t:'归档', text:'「' + last.text + '」' },
       { t:'', text: last.note },
       { t:'', text:'狱警服从度 ' + Math.round(g.obedience) + '，囚犯敌意 ' + Math.round(g.hostility) + '。' },
     ];
+    if (lex.notes.length) view.report.push({ t:'提醒', text: lex.notes[0] });
     await paint();
   });
 }
 
+// ---------- 行动依据：把引擎这一夜真实记录过的「从哪来、到哪去、哪条规矩、判了什么」摊开 ----------
+function roomName(z) { return (E.ROOMS[z] && E.ROOMS[z].name) || z || ''; }
+function pct(x) { return Math.round((x || 0) * 100) + '%'; }
+function ruleMark(id) {
+  const i = (g.rules || []).findIndex((r) => r.id === id);
+  return ['①', '②', '③', '④', '⑤', '⑥'][i] || '·';
+}
+function whyStepHtml(t) {
+  const from = roomName(t.from);
+  const to = roomName(t.room);
+  const where = from && to && from !== to ? from + ' → ' + to : (to || from);
+  let verdict = '无规矩适用';
+  let cls = '';
+  if (t.verdict === 'prepared') { verdict = '上一夜已备好，不构成新的风险'; cls = 'ok'; }
+  else if (t.verdict === 'blocked') { verdict = '第 ' + ruleMark(t.ruleId) + ' 条命中（执行率 ' + pct(t.chance) + '）'; cls = 'bad'; }
+  else if (t.verdict === 'leaked') { verdict = '第 ' + ruleMark(t.ruleId) + ' 条没拦住（执行率 ' + pct(t.chance) + '）'; cls = 'leak'; }
+  if (t.caught) verdict += t.blind ? '；狱警把光挪开了' : '；狱警抓住了他';
+  return '<div class="wstep" data-act="locate" data-room="' + esc(t.room || '') + '" style="cursor:pointer"><div class="wtime">' + esc(t.t || '') + '</div>' +
+    '<div class="wbody"><div class="wact">' + esc(t.label || '') + '</div>' +
+    '<div class="wverd ' + cls + '">' + esc(where) + ' · ' + esc(verdict) + '</div>' +
+    (t.ruleText ? '<div class="wrule">「' + esc(t.ruleText) + '」</div>' : '') + '</div></div>';
+}
+function showWhy() {
+  const last = g && g.nights && g.nights[g.nights.length - 1];
+  if (!last) return toast('还没有昨夜可以查。');
+  const trace = last.trace || [];
+  const total = last.routeTotal || trace.length;
+  const outcome = {
+    blocked:'他被拦在门口，这一夜没能再往前走。',
+    partial:'他走到一半，被拦了回去。',
+    caught:'狱警抓住了他。',
+    slip:'狱警看见了他，把光挪开了。',
+    escape:'他出去了。',
+    idle:'这一夜什么也没发生。',
+  }[last.outcome] || '这一夜结束了。';
+  const ruleIds = [...new Set(trace.filter((t) => t.ruleId).map((t) => t.ruleId))];
+  const ruleRows = ruleIds.map((id) => {
+    const rule = (g.rules || []).find((r) => r.id === id);
+    const hit = trace.find((t) => t.ruleId === id) || {};
+    return '<div class="wrule">' + ruleMark(id) + ' ' + esc(rule ? rule.text : '') +
+      ' <span>· 执行率 ' + pct(hit.chance) + '</span></div>';
+  }).join('');
+  const openRooms = [...new Set(trace.filter((t) => !t.ruleId || t.verdict === 'leaked')
+    .map((t) => roomName(t.room)).filter(Boolean))];
+  const sheet = openSheet(
+    '<h3>这 一 夜 的 行 动 依 据</h3>' +
+    '<p class="sub">第 ' + (last.night || 1) + ' 夜 · 「' + esc(last.routeName || last.routeId) + '」</p>' +
+    '<div class="verdict">' +
+      '<div class="q">他从「' + esc(roomName(last.startRoom)) + '」出发，走的是「' + esc(last.routeName || '') + '」。</div>' +
+      '<div class="n">引擎判定：' + esc(outcome) + '</div>' +
+    '</div>' +
+    '<div class="why">' +
+      '<h4>他这一夜实际走过的每一步</h4>' +
+      (trace.length ? trace.map(whyStepHtml).join('') : '<div class="wrule">这一夜他没有走出第一步。</div>') +
+      (trace.length < total ? '<div class="wrule">这条路线还有 ' + (total - trace.length) + ' 步，他这一夜没走到。</div>' : '') +
+      '<h4>参与判定的规矩</h4>' +
+      (ruleRows || '<div class="wrule">这一夜没有任何一条规矩碰到他的路线。</div>') +
+      '<h4>引擎结论</h4>' +
+      '<div class="wrule">' + esc(last.outcome === 'escape'
+        ? '没有任何一条规矩真正拦住他。'
+        : (ruleRows ? '规矩参与了判定，结果以上面每一步的引擎判定为准。' : '他走的这条路上没有你的规矩；这是路线选择，不是判定失败。')) + '</div>' +
+      (openRooms.length ? '<div class="wnote">这些落脚点没有被规矩拦到：' + esc(openRooms.join('、')) +
+        '。下一次可以把规矩写到具体房间，或者守住他跨出去的那道门。</div>' : '') +
+      '<div class="wnote">本页只复述引擎实际记录过的判定，不展示模型的思考过程。</div>' +
+    '</div>' +
+    '<div class="row"><button class="btn primary" data-k="why-close">知 道 了</button></div>'
+  );
+  sheet.querySelector('[data-k="why-close"]').addEventListener('click', closeSheet);
+}
+
+// 报告/行动依据里的「在地图上标出这个房间」：只加一层临时高亮，不碰判定与状态。
+function locateRoom(room) {
+  if (!room) return;
+  const layer = document.querySelector('#map-room');
+  if (!layer) return;
+  closeSheet();
+  const old = layer.querySelector('#room-spot');
+  if (old) old.remove();
+  const c = FALLBACK[room] || [380, 250];
+  const NS = 'http://www.w3.org/2000/svg';
+  const g = document.createElementNS(NS, 'g');
+  g.setAttribute('id', 'room-spot');
+  const r = document.createElementNS(NS, 'rect');
+  r.setAttribute('x', String(c[0] - 64));
+  r.setAttribute('y', String(c[1] - 46));
+  r.setAttribute('width', '128');
+  r.setAttribute('height', '92');
+  r.setAttribute('fill', 'none');
+  r.setAttribute('stroke', '#882e1f');
+  r.setAttribute('stroke-width', '3');
+  r.setAttribute('rx', '2');
+  g.appendChild(r);
+  layer.appendChild(g);
+  toast('在地图上标出「' + roomName(room) + '」。');
+  setTimeout(function () { if (g.parentNode) g.parentNode.removeChild(g); }, 2400);
+}
+
 function costHint(r) {
   const l = r.rule ? r.rule.lang : r.lang;
+  if (!l) return '';
   const broad = l.zones === 'ALL' || (l.window.from === 0 && l.window.to === 1439);
-  return broad
-    ? '这条规矩管得太宽了。狱警会照办，但不会认真照办——服从度会掉得更快。'
-    : '这条规矩写得很具体。具体就意味着他真的会去执行。';
+  const P = E.PARAMS;
+  const cost = P.obediencePerRule +
+    (l.zones === 'ALL' ? P.obedienceBroadZone : 0) +
+    (l.window.from === 0 && l.window.to === 1439 ? P.obedienceBroadTime : 0);
+  const after = Math.max(P.obedienceFloor, Math.round((g.obedience + cost) * 10) / 10);
+  let p = 1;
+  try { p = E.ruleStrength(g, { lang: l, leaks: 0, wear: 0 }); } catch (err) {}
+  const est = '写下之后：服从度 ' + Math.round(g.obedience) + ' → ' + after +
+    '　这条规矩在他真走那条路时的执行率约 ' + Math.round(p * 100) + '%。';
+  const tail = l.boundary
+    ? '边界规矩守的是门槛，不是整间房：守门比室内巡查更难，但拦下来就是实打实的一夜。'
+    : (broad
+      ? '这条规矩管得太宽了。狱警会照办，但不会认真照办——服从度会掉得更快。'
+      : '这条规矩写得很具体。具体就意味着他真的会去执行。');
+  return est + ' ' + tail;
 }
 
 // ---------- 预判 + 入夜 ----------
 async function askNight() {
   if (busy) return;
+  hideCoach();
   if (g.day === 5 && !wroteToday) return toast('今晚上级检查：你必须再写一条规矩。');
   const holes = E.enumerateHoles(g);
   const sheet = openSheet(
@@ -500,6 +661,67 @@ async function showSettle() {
   };
   view.report = [];
   await paint();
+  mountReviewBtn();
+}
+
+// ---------- 结算后的四问回顾：只统计引擎记录，不替玩家打分 ----------
+function showReview() {
+  const nights = g.nights || [];
+  const steps = [];
+  nights.forEach(function (n) { (n.trace || []).forEach(function (t) { steps.push(t); }); });
+  const stat = (g.rules || []).map(function (r) {
+    const mine = steps.filter(function (t) { return t.ruleId === r.id; });
+    return {
+      rule: r,
+      blocked: mine.filter(function (t) { return t.verdict === 'blocked'; }).length,
+      leaked: mine.filter(function (t) { return t.verdict === 'leaked'; }).length,
+    };
+  });
+  const used = stat.filter(function (s) { return s.blocked + s.leaked > 0; });
+  const cold = stat.filter(function (s) { return s.blocked + s.leaked === 0; });
+  used.sort(function (a, b) { return b.blocked - a.blocked; });
+  const top = used[0];
+  const worst = used.slice().sort(function (a, b) { return (b.leaked - b.blocked) - (a.leaked - a.blocked); })[0];
+  const right = nights.filter(function (n) { return n.predictedRight; }).length;
+  const risky = nights.filter(function (n) {
+    return (n.trace || []).some(function (t) { return t.leaked === true || t.verdict === 'leaked'; });
+  });
+  const q = [];
+  q.push('<div class="qa"><b>① 哪条规矩真的拦住了他？</b><p>' +
+    (top && top.blocked ? '「' + esc(top.rule.text) + '」——拦下 ' + top.blocked + ' 次。' +
+      (top.leaked ? '也漏过 ' + top.leaked + ' 次。' : '一次没漏。') :
+      '没有一条规矩真正拦住过他。这条路上，你写的东西更像愿望，不是门。') + '</p></div>');
+  q.push('<div class="qa"><b>② 哪条规矩一次也没用上？</b><p>' +
+    (cold.length ? cold.map(function (s) { return '「' + esc(s.rule.text) + '」'; }).join('、') +
+      '——他一次也没走到那条规矩管的地方。' :
+      '六条规矩都碰到过他的路线，没有一条是纯摆设。') + '</p></div>');
+  q.push('<div class="qa"><b>③ 你的预判准了几夜？</b><p>' +
+    '七夜里猜中 ' + right + ' 夜。' +
+    (risky.length ? '有 ' + risky.length + ' 夜里，他明明踩中了你的规矩，还是漏了过去——那是服从度在掉。' :
+      '没有一夜是“规矩在，但没人执行”。') + '</p></div>');
+  q.push('<div class="qa"><b>④ 如果只能改一条，改哪条？</b><p>' +
+    (worst && worst.leaked > worst.blocked
+      ? '先改「' + esc(worst.rule.text) + '」：它被踩中了，却没拦住。写得再窄一点，或者换到他真正会停下的那道门。'
+      : (cold.length
+        ? '把「' + esc(cold[0].rule.text) + '」换掉：它一次也没等到他。用这六条里的一条，去堵他真走过的那条路。'
+        : '结构已经咬合了。下次可以试着少写一条宽规矩，把省下的服从度留给一条更窄的边界规矩。')) + '</p></div>');
+  const sheet = openSheet(
+    '<h3>结 局 回 顾</h3>' +
+    '<p class="sub">四个问题，都从这七夜的引擎记录里来</p>' +
+    '<div class="review">' + q.join('') + '</div>' +
+    '<div class="row"><button class="btn primary" data-k="review-close">关 上</button></div>'
+  );
+  sheet.querySelector('[data-k="review-close"]').addEventListener('click', closeSheet);
+}
+function mountReviewBtn() {
+  const old = document.getElementById('review-btn');
+  if (old && old.parentNode) old.parentNode.removeChild(old);
+  if (!g || !g.escaped && !(g.nights && g.nights.length >= g.maxDays)) return;
+  const b = document.createElement('button');
+  b.id = 'review-btn';
+  b.textContent = '结 局 回 顾 ▸';
+  b.addEventListener('click', showReview);
+  ov.appendChild(b);
 }
 
 // ---------- 点击 ----------
@@ -558,6 +780,8 @@ document.addEventListener('click', (ev) => {
   const act = el.dataset.act;
   if (act === 'write') askWrite();
   if (act === 'night') askNight();
+  if (act === 'why') showWhy();
+  if (act === 'locate') locateRoom(el.dataset.room);
 });
 // 部分移动浏览器在 SVG 上不合成 click：touchend / pointerup 各兜一层（startGame 内有 700ms 去重）
 document.addEventListener('touchend', (ev) => { if (view && view.phase === 'cover') tryStart(ev); }, { passive: true });

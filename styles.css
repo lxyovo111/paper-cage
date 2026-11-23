@@ -97,6 +97,48 @@ body{
 .ai-pend{margin-top:6px;font-size:11px;letter-spacing:1px;color:#9c8e78;animation:pendblink 1.6s ease-in-out infinite}
 @keyframes pendblink{0%,100%{opacity:.45}50%{opacity:.9}}
 .ai-tag{margin-left:8px;padding:1px 6px;border:1px solid rgba(136,46,31,.45);color:var(--red);font-size:10px;letter-spacing:1px;vertical-align:1px}
+/* 判定条的可核对字段：对象/时间/地点/限制 + 不能悄悄缩窄的提醒 */
+.vfields{margin-top:10px;border-top:1px solid rgba(90,70,40,.18);padding-top:8px}
+.vrow{display:flex;gap:10px;align-items:flex-start;padding:3px 0;font-size:11.5px;line-height:1.55}
+.vrow span{flex:0 0 34px;color:var(--muted);letter-spacing:1px}
+.vrow b{font-weight:400;color:var(--ink)}
+.vtag{margin-left:8px;padding:1px 6px;border:1px solid rgba(90,70,40,.28);color:var(--muted);font-size:10px;letter-spacing:1px;vertical-align:1px}
+.vwarn{margin-top:6px;padding-left:8px;border-left:2px solid rgba(136,46,31,.35);font-size:11px;line-height:1.5;color:#7c5a45}
+
+/* 行动依据：引擎这一夜实际走过的每一步 */
+.why{margin-top:14px;border-top:1px solid rgba(90,70,40,.18);padding-top:10px}
+.why h4{margin:12px 0 4px;font-weight:400;font-size:12px;letter-spacing:2px;color:var(--ink2)}
+.wstep{display:flex;gap:10px;padding:7px 0;border-bottom:1px dashed rgba(90,70,40,.14)}
+.wstep:last-of-type{border-bottom:0}
+.wtime{flex:0 0 44px;padding-top:1px;font-size:11px;color:var(--muted);letter-spacing:.5px}
+.wbody{flex:1;min-width:0}
+.wact{font-family:var(--kai);font-size:15px;line-height:1.45;color:var(--ink)}
+.wverd{margin-top:3px;font-size:11px;line-height:1.5;color:var(--muted)}
+.wverd.bad{color:var(--red)}
+.wverd.leak{color:#9a6a2f}
+.wrule{margin-top:4px;font-size:10.5px;line-height:1.5;color:#7c6a52;word-break:break-word}
+.wrule span{color:var(--muted)}
+.wnote{margin-top:10px;padding:8px 10px;background:rgba(128,96,60,.07);font-size:11px;line-height:1.6;color:#7c5a45}
+
+/* 首回合引导：不挡地图，可跳过 */
+#coach{position:absolute;right:24px;top:116px;z-index:12;max-width:330px;padding:14px 16px 12px;
+  background:rgba(240,230,208,.96);border:1px solid rgba(90,70,40,.45);box-shadow:0 12px 30px rgba(0,0,0,.25);
+  font-family:var(--song);color:var(--ink2)}
+#coach .coach-t{font-family:var(--kai);font-size:15px;letter-spacing:3px;color:var(--ink);margin-bottom:7px}
+#coach .coach-b{font-size:12px;line-height:1.75;color:#574a3a;letter-spacing:.5px}
+#coach .coach-r{display:flex;justify-content:flex-end;gap:8px;margin-top:9px}
+#coach .btn{padding:5px 12px;font-size:12px;letter-spacing:2px}
+/* 结算后的四问回顾 */
+#review-btn{position:absolute;left:22px;bottom:22px;z-index:12;padding:9px 16px;cursor:pointer;
+  font-family:var(--song);font-size:12px;letter-spacing:3px;color:var(--red);background:rgba(240,230,208,.92);
+  border:1px solid rgba(136,46,31,.5)}
+#review-btn:hover{background:rgba(136,46,31,.1)}
+.review .qa{padding:9px 0;border-bottom:1px dashed rgba(90,70,40,.16)}
+.review .qa:last-child{border-bottom:0}
+.review .qa b{font-weight:400;font-size:12px;letter-spacing:1px;color:var(--ink)}
+.review .qa p{margin:4px 0 0;font-family:var(--kai);font-size:15px;line-height:1.6;color:#574a3a}
+#room-spot rect{animation:roomspot 2.4s ease-out forwards}
+@keyframes roomspot{0%{opacity:0}12%{opacity:1}78%{opacity:1}100%{opacity:0}}
 /* 预判 */
 .chips{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
 .chip{
@@ -166,6 +208,19 @@ svg.night #token-prisoner { opacity: 0; }
   .settle .s { font-size: 13px; }
   .settle .quote { font-size: 15px; max-width: 100%; }
   .settle .stats { gap: 18px; font-size: 11px; }
+
+  .why { margin-top: 10px; padding-top: 8px; }
+  .why h4 { margin: 10px 0 3px; font-size: 11.5px; letter-spacing: 1px; }
+  .wstep { gap: 8px; padding: 6px 0; }
+  .wtime { flex: 0 0 38px; font-size: 10.5px; }
+  .wact { font-size: 14px; }
+  .wverd { font-size: 10.5px; }
+  .wrule { font-size: 10px; }
+  .wnote { padding: 7px 8px; font-size: 10.5px; }
+  #coach { left: 10px; right: 10px; bottom: 10px; max-width: none; padding: 11px 12px 10px; }
+  #coach .coach-b { font-size: 11.5px; }
+  #review-btn { left: 10px; bottom: 10px; font-size: 11px; padding: 8px 12px; }
+  .review .qa p { font-size: 14px; }
   #toast { position: fixed !important; bottom: 12px !important; left: 50% !important; }
 }
 
@@ -192,6 +247,19 @@ svg.night #token-prisoner { opacity: 0; }
   .chip .nm { font-size: 14px; }
   .chip .in { font-size: 10.5px; }
   #mute-btn { width: 22px; height: 22px; left: 1.2%; top: 4%; font-size: 10px; opacity: .4; }
+
+  .why { margin-top: 8px; padding-top: 6px; }
+  .why h4 { margin: 8px 0 2px; font-size: 10.5px; letter-spacing: 1px; }
+  .wstep { gap: 7px; padding: 4px 0; }
+  .wtime { flex: 0 0 34px; font-size: 9.5px; }
+  .wact { font-size: 12.5px; }
+  .wverd { font-size: 9.5px; }
+  .wrule { font-size: 9px; }
+  .wnote { padding: 6px 7px; font-size: 9.5px; }
+  #coach { left: auto; right: 8px; top: 58px; bottom: auto; max-width: 300px; padding: 8px 10px 7px; }
+  #coach .coach-b { font-size: 10px; line-height: 1.55; }
+  #review-btn { left: 8px; bottom: 8px; font-size: 10px; padding: 6px 10px; }
+  .review .qa p { font-size: 12px; }
   #toast { position: fixed !important; bottom: 8px !important; left: 50% !important; }
 }
 

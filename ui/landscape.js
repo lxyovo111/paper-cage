@@ -206,13 +206,22 @@ function reportBlock(st) {
   const rows = (st.report || []).slice(0, 6);
   let g = T(26, 390, '巡 查 报 告', { size: 14, tracking: 3, fill: C.INK });
   if (!night) {
+    g += '<g data-act="why" style="cursor:pointer"><rect x="1080" y="374" width="74" height="24" fill="#000" opacity="0.001"/>' +
+      T(1154, 390, '行动依据 ▸', { size: 11, anchor: 'end', fill: C.WARM, tracking: 0.5 }) + '</g>';
+  }
+  if (!night) {
     let y = 414;
     for (const r of rows) {
       if (y > 536) break;
-      if (r.t) g += T(26, y, r.t, { size: 12, fill: C.MUTED });
+      const rowParts = [];
+      if (r.t) rowParts.push(T(26, y, r.t, { size: 12, fill: C.MUTED }));
       const lines = wrap(r.text, 25).slice(0, 2);
-      lines.forEach((ln, i) => { g += T(64, y + i * 20, ln, { size: 16, font: KAI, fill: i ? C.MUTED : C.INK }); });
-      y += lines.length > 1 ? 40 : 26;
+      lines.forEach((ln, i) => { rowParts.push(T(64, y + i * 20, ln, { size: 16, font: KAI, fill: i ? C.MUTED : C.INK })); });
+      const rowH = lines.length > 1 ? 40 : 26;
+      g += '<g data-act="locate" data-room="' + (r.room || '') + '" style="cursor:pointer">' +
+        '<rect x="20" y="' + (y - 14) + '" width="1134" height="' + rowH + '" fill="#000" opacity="0.001"/>' +
+        rowParts.join('') + '</g>';
+      y += rowH;
     }
   }
   // 夜里逐条打字：坐标沿用桌面版（y 从 792 起），由 data-cfg 折算到横屏版式

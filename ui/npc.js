@@ -51,6 +51,8 @@ export async function compileSmart(text) {
     const fixed = ruleFromLang(text, {
       window: L.window, zones: L.zones === 'ALL' ? 'ALL' : (Array.isArray(L.zones) ? L.zones : 'ALL'),
       actions: L.actions, escort: L.escort, item: ITEMS.includes(L.item) ? L.item : null,
+      boundary: L.boundary === 'leave' || L.boundary === 'enter' ? L.boundary : null,
+      subject: L.subject === 'any' ? 'any' : 'target',
     });
     // 双保险：本地能编译出具体区域/时间时，与 LLM 结果取「更具体」的一方
     const best = pickStricter(local, fixed);
@@ -67,6 +69,11 @@ function spec(l) {
 }
 function pickStricter(a, b) {
   const A = { lang: a.rule.lang, note: a.note }, B = { lang: b.lang, note: b.note };
+  // 边界语义优先级最高：如果本地从「离开/进入」检测出了边界，而模型漏了，
+  // 不能用模型的「在房间里禁止移动」覆盖它——那正是玩家会当场发现的范围缩窄。
+  const ab = !!A.lang.boundary, bb = !!B.lang.boundary;
+  if (ab !== bb) return ab ? A : B;
+  if (ab && A.lang.boundary !== B.lang.boundary) return A;
   return spec(B.lang) <= spec(A.lang) ? B : A;
 }
 
