@@ -18,7 +18,7 @@
 **线上复测（2026-11-23 21:10 最终版）**：`/play` 200（180,957 字符）含「行动依据」「第一次当监狱长」；`tools/online-full.mjs` 用线上 iframe 完整跑一局（seed 8 / llm=1 / 7 夜），确认卡显示对象/时间/地点/限制与三条提醒、行动依据逐步显示命中第①条及执行率、报告行可点地图红框、结算 `#review-btn` 四问齐全、`errors=[]`；`tools/online-quick.mjs` 另测首回合纸条出现/可跳过、AI 校准后确认卡显示「AI 已校准」并保留 `22:00–05:00 · 医务室 · 禁止进入`。
 **A/B/C/D 对照（2026-11-23 21:20，线上同种子 8 / 各 4 夜）**：A = AI 开 + 三条规矩（医务室禁止进入 / 放风区墙禁止碰 / 储藏室麻绳禁止取）→ 第1夜「狱警的钥匙」被抓，第2–4夜「食堂的后门」；B = AI 关 + 同三条规矩 → 连续四夜「狱警的钥匙」，第4夜逃出；C = AI 开、无规矩 → 连续四夜「医务室的窗」；D = AI 关、无规矩 → 同样四夜「医务室的窗」。结论：判定与结局完全由引擎算，AI 开关不改变判定；但 A 组第1夜被抓后换路、B 组不换，说明跨回合记忆/理由参与了选路；C/D 路线一致，AI 只多出理由句。
 
-**部署（2026-11-23 12:19–12:33）**：在用户登录的 9225 Edge 里用 `tools/upload925.mjs` 上传 `.upload/index.html`（202,786 B），`tools/deploy925b.mjs` 点「重新部署 → 确认部署」，后台 `tools/wait-deploy2.mjs` 等到 `/play` 200（180,878 字符）含新标记，耗时 820s。之后又修了结局回顾里写死的「六条规矩」（只有 1 条规矩时会说错），重新打包 202,842 B，21:10 二次部署成功（`/play` 180,957 字符），`tools/online-full.mjs` 复测：一局 7 夜 settle、结局回顾显示「你写下的 1 条规矩…」、`errors=[]`。`tools/.ms-key` 仍是只读令牌，Git push 与 OpenAPI 均被拒（`token does not support repository operations` / `OperationNotAllowed`），因此部署只走浏览器 UI；同版本已先 push 到 GitHub `6ba6611`。
+**部署（2026-11-23 12:19–12:33）**：在用户登录的 9225 Edge 里用 `tools/upload925.mjs` 上传 `.upload/index.html`（202,786 B），`tools/deploy925b.mjs` 点「重新部署 → 确认部署」，后台 `tools/wait-deploy2.mjs` 等到 `/play` 200（180,878 字符）含新标记，耗时 820s。之后又修了结局回顾里写死的「六条规矩」（只有 1 条规矩时会说错），重新打包 202,842 B，21:10 二次部署成功（`/play` 180,957 字符），`tools/online-full.mjs` 复测：一局 7 夜 settle、结局回顾显示「你写下的 1 条规矩…」、`errors=[]`。`tools/.ms-key` 仍是只读令牌，Git push 与 OpenAPI 均被拒（`token does not support repository operations` / `OperationNotAllowed`），因此部署只走浏览器 UI；最终版已 push 到 GitHub `9e0a4e4`。
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
@@ -28,7 +28,7 @@
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
 - 参赛报名：已审核通过（小红书方案 https://xhslink.cn/o/Afux7g4n5JK）
 - 作品提交：旧作品「第七夜」因平台锁定作品名无法编辑，2026/11/18 12:41:11 删除后以《纸上牢笼》重新提交，2026-11-18 约 15:30 审核通过。2026-11-19 12:25 再次删除并重新提交，简介换成第三版「我把 AI 关进监狱，第一晚他就摸到了门。……」（创空间描述与手记简介同步为该版）→ 新作品 id `ad9e646f-0e72-4387-bf92-e3ceddadb9b6`，提交时间 2026/11/19 12:22:32，**2026-11-19 13:11:31 审核通过**（`review_result=passed`、`is_public=1`、`reviewed_at=1795065091`）；监听脚本 `tools/review-watch.mjs`（日志 `tools/review-watch.log` 末行 `RESULT passed`）。旧提交数据备份 `tools/submission-backup.json`。审核通过截图 `tools/sub-approved.png`（赛事首页横幅「审核通过，去提交作品」）
-- 作品广场：**已恢复可见**（`/api/works` 第 1 页即见），卡片名「纸上牢笼」、简介为第三版、分类「Gradio 应用」、封面为案卷封面；当前广场共 148 个作品，我们创空间 visits=767 / stars=0 / likes=0 / hot_score=76.7。已通过的提交信息锁定（平台规则：审核通过后改简介需删除重提，慎用）
+- 作品广场：**已恢复可见**（`/api/works` 第 1 页即见），卡片名「纸上牢笼」、简介为第三版、分类「Gradio 应用」、封面为案卷封面；当前广场共 225 个作品，我们创空间 visits=2,772 / stars=0 / likes=0（2026-11-23 21:30 查询）。已通过的提交信息锁定（平台规则：审核通过后改简介需删除重提，慎用）
 
 ## 首屏加速（2026-11-21 00:15–00:40，已上线）
 
