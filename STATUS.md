@@ -12,6 +12,7 @@
 **宽严代价**：确认卡显示写下后的服从度变化与该规矩执行率，边界/宽/具体三类定性提示。
 **结局四问**：结算后可开「结局回顾」，回答哪条真拦住、哪条没用上、预判准了几夜、只能改一条改哪条。
 **创作手记**：docs/创作手记-模板版.md 已补 AI 三处调用链路、边界语义、行动依据与音效说明；线上文章 438502 已通过 `PUT /api/v1/articles` 重写 `ContentDraft` 同步，公开页验证 `hasBad=false / hasBoundary=true / hasAI=true / hasAudio=true`。
+**行动依据位置（2026-11-23 21:26）**：桌面版「行动依据 ▸」原在 x=1468,y=776，与右下角「入夜」印章（中心 1418,812，旋转 -9°）重叠；已移到 x=1266,y=776（印章左侧，热区 1146–1274），手机 / 横屏本来不重叠，未改。
 
 **已验证**：`tools/test-rule-boundary.mjs`（原话 → `boundary:"leave"`、`22:00–05:00 · 三号牢房 · 禁止离开 · 无例外`、holes 全 blocked、第一夜 blocked）；`tools/dist-test.mjs`（settle / 6 rules / no errors）；headless Edge 桌面与手机截图确认确认卡、行动依据、地图红框、代价提示、引导纸条、结局回顾。最终 dist 202,842 B。
 

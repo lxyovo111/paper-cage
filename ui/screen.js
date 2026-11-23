@@ -128,8 +128,8 @@ function report(st) {
     <line x1="132" y1="752" x2="1468" y2="752" stroke="${C.INK2}" stroke-width="0.8" opacity="0.4"/>
     ${T(132, 776, '巡 查 报 告', { size: 13, fill: C.INK, tracking: 4 })}
     <g data-act="why" style="cursor:pointer">
-      <rect x="1352" y="760" width="116" height="24" fill="#000" opacity="0.001"/>
-      ${T(1468, 776, '行动依据 ▸', { size: 10.5, anchor: 'end', fill: C.WARM, tracking: 1 })}
+      <rect x="1146" y="760" width="128" height="24" fill="#000" opacity="0.001"/>
+      ${T(1266, 776, '行动依据 ▸', { size: 10.5, anchor: 'end', fill: C.WARM, tracking: 1 })}
     </g>
     ${T(132, 924, '值 班 人', { size: 10, fill: C.MUT2, tracking: 3 })}
     ${T(196, 924, '李', { size: 15, font: KAI, fill: C.INK2 })}
