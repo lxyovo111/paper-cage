@@ -1,0 +1,13 @@
+import { connect } from './browser.mjs';
+import fs from 'node:fs';
+const OUT='C:/Users/lcj/Desktop/tap/six-rules/tools/';
+const c=await connect();
+const f=await c.attachFrame('ms.show/play');
+console.log('frame',f&&f.url);
+if(!f) process.exit(1);
+const info=await c.ev('(function(){function r(sel){var e=document.querySelector(sel);if(!e)return null;var b=e.getBoundingClientRect();return {x:Math.round(b.x),y:Math.round(b.y),w:Math.round(b.width),h:Math.round(b.height)};}var a=r("[data-act=why]"),b=r("[data-act=night]");var ov=null;if(a&&b){var ix=Math.max(0,Math.min(a.x+a.w,b.x+b.w)-Math.max(a.x,b.x));var iy=Math.max(0,Math.min(a.y+a.h,b.y+b.h)-Math.max(a.y,b.y));ov={w:ix,h:iy,area:ix*iy};}return {href:location.href,why:a,night:b,overlap:ov,label:(document.querySelector("[data-act=why]")||{}).textContent};})()',f.sessionId);
+console.log(JSON.stringify(info,null,1));
+const s=await c.send('Page.captureScreenshot',{format:'png',clip:{x:1000,y:690,width:560,height:300,scale:1}});
+fs.writeFileSync(OUT+'v-online-fix-clip.png',Buffer.from(s.data,'base64'));
+console.log('shot',OUT+'v-online-fix-clip.png');
+c.close();
