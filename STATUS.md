@@ -1,4 +1,30 @@
-# 《纸上牢笼》· 交付状态（2026-11-23 21:36）
+# 《纸上牢笼》· 交付状态（2026-11-25 21:25）
+
+## 2026-11-25 第5天互锁修复（本地已测，待上线）
+
+起因：用户指出第5天「上级检查必须再写一条」与「最多六条」互锁，若前四天写满就会卡死。复盘后发现问题比预想更严重：
+
+1. **实际线上方向相反**：`wroteToday` 从 `newGame()` 起只置 true，从不按天清零。第5天只要此前任意一天写过规矩，检查就被绕过；如果从没写过，六条满时才会卡住。
+2. **满六条没有合法出口**：现在允许在检查时选一条旧规矩改写，槽位仍是六条；引擎 `rewriteRule` 保留原 `id`，旧正文留在 `rewrittenFrom`，过去夜里引用过的那条仍能对上。
+3. **零行动力也会卡死**：若第5天把行动力花光，检查要求写/改写，但旧逻辑会拒绝「今天没有行动力」。现在第5天检查当次在行动力不足时免单（`free`）：改写或新写都不扣 AP；有 AP 时仍扣 1。
+
+**改动**：
+- `ui/app.js` `dayBriefing()`：`const prevDay = view ? view.day : null; syncView(); if (prevDay !== null && g.day !== prevDay) { wroteToday = false; replaceRule = null; }`，按天重置「今天写过」。
+- `ui/app.js` `askWrite(opts)`：支持 `opts.replace`；`free` 自动条件为 `g.day === 5 && !wroteToday && g.ap < 1`；编辑器标题「改 写 第①条」、副标题说明旧规矩会被换掉；同一文本拒绝「写一条不一样的」。
+- `ui/app.js` `askInspectionRewrite()`：六条已满时列出六个 `.chip`，点选后进入改写；提示动态显示是否扣行动力。
+- `ui/app.js` `showVerdict()`：改写时标题「改 写 完 毕」；`E.writeRule` / `E.rewriteRule` 传入 `{ free }`；提示写明「这次改写/写入不扣行动力」。
+- `game/engine.js`：`writeRule(state,text,compiled,opts)` 与 `rewriteRule(state,id,text,compiled,opts)` 支持 `free`，默认三/四参调用行为不变；返回带 `free`。
+
+**本地验证**：
+- `node tools/test-inspection.mjs` 通过；`tools/test-rule-boundary.mjs` 全过。
+- `node tools/test-inspection-zero.mjs`（六条满 / day5 / AP0）：检查面板 6 chip，提示「行动力已用完：这次改写不扣行动力」，改写后 `{rules:6,id:"r1",ap:0}`，再次入夜进入预判面板（9 chip）。
+- `node tools/test-inspection-zero-new.mjs`（1 条 / day5 / AP0）：`askNight` 提示必须写，点空槽仍能打开编辑器，副标题「这条规矩不扣行动力」，写入后 `{rules:2,ap:0}`，再次入夜进入预判面板。
+- `node tools/test-inspection-reset.mjs`：第1天写一条 → 手动拨到第4天 → 点「不猜，直接入夜」跑到第5天；`dayBriefing()` 已把 `wroteToday` 清零，第5天 `askNight` 重新要求写规矩（`toast`「今晚上级检查：你必须再写一条规矩」），不再绕过检查。
+- `node tools/test-inspection-ui.mjs`（六条满 / day5 / AP2）：改写后 `{rules:6,id:"r1",ap:1}`，改写消耗 1 AP。
+- `node tools/dist-test.mjs`：完整一局 `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，`errors= none`。
+- `node tools/bundle.mjs` → `dist/index.html` 207,556 B。
+
+**部署状态：未上线。** 本机所有 Edge profile（`edge-cdp`、`edge-login`、`six-rules/edge-login`）与共享 DSH 浏览器都没有 ModelScope 登录态（`/api/v1/users/me` 返回 400；files 页没有「添加文件」）；`.ms-key` 只有读权限，git push 被远端拒绝 `token does not support repository operations`。因此线上仍是 2026-11-23 21:10 的版本。需要人类在共享浏览器登录 ModelScope（或提供有 repository 权限的 token）后才能上传并重新部署。
 
 ## 2026-11-23 规则可核对性改版（已上线）
 

@@ -305,23 +305,55 @@ export function createGame(seed = 1) {
 }
 const note = (st, text, kind='sys') => st.notes.push({ day:st.day, kind, text });
 
-export function writeRule(state, text, compiled) {
-  if (state.rules.length >= PARAMS.rulesMax) return { ok:false, error:'六条规矩已经写满。' };
-  if (state.ap < 1) return { ok:false, error:'今天没有行动力了。' };
-  const c = (compiled && compiled.ok && compiled.lang)
-    ? { ok:true, rule:{ text, lang:compiled.lang, note:compiled.note, leaks:0, broken:false }, note:compiled.note }
-    : compileRule(text);
-  if (!c.ok) return c;
-  const rule = { ...c.rule, id:'r' + (state.rules.length + 1), day:state.day };
-  state.rules.push(rule);
-  state.ap -= 1;
-  const cost = PARAMS.obediencePerRule
+function ruleCost(rule) {
+  return PARAMS.obediencePerRule
     + (rule.lang.zones === 'ALL' ? PARAMS.obedienceBroadZone : 0)
     + (rule.lang.window.from === 0 && rule.lang.window.to === 1439 ? PARAMS.obedienceBroadTime : 0);
+}
+
+function applyRuleCost(state, rule) {
+  const cost = ruleCost(rule);
   state.obedience = Math.max(PARAMS.obedienceFloor, state.obedience + cost);
   state.hostility = Math.min(100, state.hostility + PARAMS.hostilityRule);
   note(state, '狱警服从度 ' + cost + '，囚犯敌意 +10。', 'cost');
-  return { ok:true, rule, note:c.note };
+  return cost;
+}
+
+function compileForRule(text, compiled) {
+  if (compiled && compiled.ok && compiled.lang) {
+    return { ok:true, rule:{ text, lang:compiled.lang, note:compiled.note, leaks:0, broken:false }, note:compiled.note };
+  }
+  return compileRule(text);
+}
+
+export function writeRule(state, text, compiled, opts) {
+  const free = !!(opts && opts.free);
+  if (state.rules.length >= PARAMS.rulesMax) return { ok:false, error:'六条规矩已经写满。' };
+  if (!free && state.ap < 1) return { ok:false, error:'今天没有行动力了。' };
+  const c = compileForRule(text, compiled);
+  if (!c.ok) return c;
+  const rule = { ...c.rule, id:'r' + (state.rules.length + 1), day:state.day };
+  state.rules.push(rule);
+  if (!free) state.ap -= 1;
+  applyRuleCost(state, rule);
+  return { ok:true, rule, note:c.note, free };
+}
+
+// 上级检查遇到「六条已满」时的合法出口：改写一条旧规矩，槽位仍是六条。
+// id 保持不变，历史夜里引用过的那一条仍然能对上；旧正文留在 rewrittenFrom 里。
+export function rewriteRule(state, id, text, compiled, opts) {
+  const free = !!(opts && opts.free);
+  if (!free && state.ap < 1) return { ok:false, error:'今天没有行动力了。' };
+  const idx = state.rules.findIndex(r => r.id === id);
+  if (idx < 0) return { ok:false, error:'没有这条规矩。' };
+  const c = compileForRule(text, compiled);
+  if (!c.ok) return c;
+  const old = state.rules[idx];
+  const rule = { ...c.rule, id:old.id, day:state.day, rewrittenFrom:old.text };
+  state.rules[idx] = rule;
+  if (!free) state.ap -= 1;
+  applyRuleCost(state, rule);
+  return { ok:true, rule, note:c.note, replaced:old.text, free };
 }
 
 export function predict(state, routeId) {

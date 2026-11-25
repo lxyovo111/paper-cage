@@ -15,7 +15,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const SPEED = Math.max(0.02, Math.min(4, +(new URLSearchParams(location.search).get('speed') || 1)));
 const wait = (ms) => sleep(ms * SPEED);
 
-let g = null, view = null, busy = false, wroteToday = false;
+let g = null, view = null, busy = false, wroteToday = false, replaceRule = null;
 let coachSeen = false;
 // 给评审看的一行账：这一局 AI 出了多少次手、其中多少次真的生效（失败就是降级成规则）
 let aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
@@ -175,6 +175,7 @@ function newGame() {
   g = E.createGame(m ? +m[1] : (Date.now() % 90000) + 1000);
   view = { phase:'day', day:1, ap:3, apMax:3, obedience:100, hostility:30, rules:[], report:[], path:null, tokens:null };
   wroteToday = false;
+  replaceRule = null;
   const rb = document.getElementById('review-btn');
   if (rb && rb.parentNode) rb.parentNode.removeChild(rb);
   aiStat = { picks: 0, picksLLM: 0, lines: 0, linesLLM: 0 };
@@ -186,7 +187,11 @@ function newGame() {
 }
 
 function dayBriefing() {
+  const prevDay = view ? view.day : null;
   syncView();
+  // 「今天写过没有」必须按天清零：否则第 5 天的上级检查只看开局有没有写过，
+  // 写过一次就永远绕过去了，检查形同虚设。
+  if (prevDay !== null && g.day !== prevDay) { wroteToday = false; replaceRule = null; }
   view.phase = 'day'; view.path = null; view.tokens = null;
   const d = g.day;
   let lines = [];
@@ -208,7 +213,10 @@ function dayBriefing() {
     { t:'', text:'写一条规矩，然后按右下角的「入夜」。' },
   ];
   else if (d === 3) lines.push({ t:'22:30', text: E.DAY_EVENTS[3].text });
-  else if (d === 5) lines.push({ t:'17:00', text: E.DAY_EVENTS[5].text });
+  else if (d === 5) {
+    const full = g.rules.length >= E.PARAMS.rulesMax;
+    lines.push({ t:'17:00', text: E.DAY_EVENTS[5].text + (full ? '（六条已满，可改写一条）' : '') });
+  }
   else if (d === 6) lines.push({ t:'15:00', text: E.DAY_EVENTS[6].text });
   else if (d !== 1) lines.push({ t:'', text:'第 ' + CN[d] + ' 天。他今天话少。' });
   view.report = lines.slice(0, 4);
@@ -227,15 +235,23 @@ const EXAMPLES = [
   '工具间的铁器，全天不许取走。',
 ];
 
-async function askWrite() {
+async function askWrite(opts) {
   if (busy) return;
   hideCoach();
-  if (g.rules.length >= E.PARAMS.rulesMax) return toast('六条规矩已经写满了。');
-  if (g.ap < 1) return toast('今天的行动力用完了。');
+  const replaceId = opts && opts.replace;
+  // 第5天上级检查：行动力用光也必须能交差，否则会卡死在「必须写」与「没行动力」之间。
+  const free = !!(opts && opts.free) || (g.day === 5 && !wroteToday && g.ap < 1);
+  const target = replaceId ? (g.rules || []).find((r) => r.id === replaceId) : null;
+  if (replaceId && !target) return toast('没有这条规矩。');
+  if (g.rules.length >= E.PARAMS.rulesMax && !target) return toast('六条规矩已经写满了。今晚上级检查：点「入夜」可改写一条。');
+  if (!free && g.ap < 1) return toast('今天的行动力用完了。');
+  replaceRule = target || null;
   const sheet = openSheet(
-    '<h3>写 一 条 规 矩</h3>' +
-    '<p class="sub">一句话说清楚：什么时候 · 在哪儿 · 不许做什么</p>' +
-    '<textarea id="rtxt" maxlength="60" placeholder="例：夜里不许离开牢房"></textarea>' +
+    '<h3>' + (target ? '改 写 第 ' + ruleMark(target.id) + ' 条' : '写 一 条 规 矩') + '</h3>' +
+    '<p class="sub">' + (target
+      ? (free ? '上级检查：行动力已用完，这次改写不扣行动力；旧规矩仍会被换掉。' : '上级检查：六条已满。改写一条也算今晚交差，旧规矩会被换掉。')
+      : (free ? '上级检查：行动力已用完，这条规矩不扣行动力。' : '一句话说清楚：什么时候 · 在哪儿 · 不许做什么')) + '</p>' +
+    '<textarea id="rtxt" maxlength="60" placeholder="例：夜里不许离开牢房">' + (target ? esc(target.text) : '') + '</textarea>' +
     '<p class="hint">写得越具体越拦得住；写得越宽，狱警越不服从。</p>' +
     '<div class="examples" id="exs">' + EXAMPLES.map((x) => '<span>' + x + '</span>').join('') + '</div>' +
     '<div class="row"><button class="btn ghost" data-k="cancel">不写了</button>' +
@@ -249,12 +265,13 @@ async function askWrite() {
   ta.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); doCompile(); } });
   sheet.addEventListener('click', (ev) => {
     const k = ev.target.dataset && ev.target.dataset.k;
-    if (k === 'cancel') closeSheet();
+    if (k === 'cancel') { replaceRule = null; closeSheet(); }
     if (k === 'compile') doCompile();
   });
   async function doCompile() {
     const text = ta.value.trim();
     if (text.length < 4) return toast('再写长一点。');
+    if (target && text === target.text) return toast('写一条不一样的，才算今晚的新规矩。');
     // 先出确定性的判定条（规则引擎，0ms），AI 随后在后台核对一遍——不挡玩家。
     // 关键：这是「预览」。玩家若先按下「写下」，就锁定预览这一版；AI 晚到也不许再改。
     let local;
@@ -262,7 +279,7 @@ async function askWrite() {
     if (!local.ok) return toast(local.error || '这句判不了。');
     audio.sfx('pen');
     sheet.__locked = false;
-    showVerdict(sheet, text, local, { pending: llmOn, calibrated: false });
+    showVerdict(sheet, text, local, { pending: llmOn, calibrated: false, replace: target, free });
     compileSmart(text).then(function (r) {
       if (!r || !r.ok) return;
       if (sheet.__locked) return;                 // 玩家已经确认过预览版：不再改写
@@ -273,7 +290,7 @@ async function askWrite() {
         return;
       }
       // AI 先回来：用校准后的判定条替换预览，并明确要求玩家再确认一次
-      showVerdict(sheet, text, r, { pending: false, calibrated: true });
+      showVerdict(sheet, text, r, { pending: false, calibrated: true, replace: target, free });
     }).catch(function () {
       const pend = sheet && sheet.querySelector && sheet.querySelector('.ai-pend');
       if (pend) pend.textContent = 'AI 未返回，按本地判定执行。';
@@ -283,6 +300,8 @@ async function askWrite() {
 
 function showVerdict(sheet, text, r, opts) {
   opts = opts || {};
+  const replace = opts.replace || null;
+  const free = !!opts.free;
   sheet.__result = r;
   audio.sfx('paper');
   const lang = r.rule ? r.rule.lang : r.lang;
@@ -292,8 +311,8 @@ function showVerdict(sheet, text, r, opts) {
     ? 'AI 已校准 · 请确认这一版'
     : (opts.pending ? '本地判定 · 预览（AI 正在核对）' : '本地判定');
   sheet.innerHTML =
-    '<h3>归 档 完 毕</h3>' +
-    '<p class="sub">你的话被译成了一条能执行的判定</p>' +
+    '<h3>' + (replace ? '改 写 完 毕' : '归 档 完 毕') + '</h3>' +
+    '<p class="sub">' + (replace ? '新规矩会替掉第 ' + ruleMark(replace.id) + ' 条，槽位仍是六条' : '你的话被译成了一条能执行的判定') + '</p>' +
     '<div class="verdict"><div class="q">' + esc(text) + '</div>' +
     '<div class="n">' + esc(r.note) + tag + '</div>' +
     '<div class="vfields">' +
@@ -305,23 +324,26 @@ function showVerdict(sheet, text, r, opts) {
     ex.notes.map((n) => '<div class="vwarn">' + esc(n) + '</div>').join('') +
     (opts.pending ? '<div class="ai-pend">AI 正在核对这条规矩的判定…（现在写下 = 锁定预览版）</div>' : '') +
     '</div>' +
-    '<p class="hint" style="margin-top:14px">' + costHint(r) + '</p>' +
+    '<p class="hint" style="margin-top:14px">' + costHint(r) + (free ? '<br>上级检查：行动力已用完，这次' + (replace ? '改写' : '写入') + '不扣行动力。' : '') + '</p>' +
     '<div class="row"><button class="btn ghost" data-k="back">改 写</button>' +
     '<button class="btn primary" data-k="ok">写 下</button></div>';
-  sheet.querySelector('[data-k="back"]').addEventListener('click', () => { closeSheet(); askWrite(); });
+  sheet.querySelector('[data-k="back"]').addEventListener('click', () => { closeSheet(); askWrite(replace ? { replace: replace.id } : undefined); });
   sheet.querySelector('[data-k="ok"]').addEventListener('click', async () => {
     const rr = sheet.__result || r;
     sheet.__locked = true;   // 锁在玩家眼前这一版：AI 晚到不得再改
-    const w = E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note });
+    const w = replace
+      ? E.rewriteRule(g, replace.id, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note }, { free })
+      : E.writeRule(g, text, { ok:true, lang: rr.rule ? rr.rule.lang : rr.lang, note: rr.note }, { free });
     if (!w.ok) { sheet.__locked = false; return toast(w.error); }
     audio.sfx('stamp');
     wroteToday = true;
+    replaceRule = null;
     closeSheet();
     syncView();
-    const last = g.rules[g.rules.length - 1];
+    const last = w.rule || g.rules[g.rules.length - 1];
     const lex = E.explainLang(last.lang);
     view.report = [
-      { t:'归档', text:'「' + last.text + '」' },
+      { t: replace ? '改写' : '归档', text:'「' + last.text + '」' },
       { t:'', text: last.note },
       { t:'', text:'狱警服从度 ' + Math.round(g.obedience) + '，囚犯敌意 ' + Math.round(g.hostility) + '。' },
     ];
@@ -449,10 +471,35 @@ function costHint(r) {
 }
 
 // ---------- 预判 + 入夜 ----------
+// 第 5 天上级检查 + 六条已满：给一个明确出口，不能让「必须写」和「写不下」互锁。
+function askInspectionRewrite() {
+  if (busy) return;
+  const free = g.ap < 1;
+  const ring = ['①', '②', '③', '④', '⑤', '⑥'];
+  const sheet = openSheet(
+    '<h3>上 级 检 查</h3>' +
+    '<p class="sub">六条已经写满。选一条改写，才算今晚交差——旧规矩会被换掉，槽位仍是六条。</p>' +
+    '<p class="hint">' + (free ? '行动力已用完：这次改写不扣行动力。' : '改写也花 1 点行动力。') + '</p>' +
+    '<div class="chips">' + g.rules.slice(0, 6).map((r, i) =>
+      '<div class="chip" data-k="pick-rule" data-id="' + r.id + '"><div><div class="nm">第 ' + ring[i] + ' 条</div>' +
+      '<div class="in">' + esc(r.text) + '</div></div></div>').join('') + '</div>' +
+    '<div class="row"><button class="btn ghost" data-k="cancel">先不写</button></div>'
+  );
+  sheet.addEventListener('click', (ev) => {
+    const k = ev.target.dataset && ev.target.dataset.k;
+    if (k === 'cancel') { closeSheet(); return; }
+    const el = ev.target.closest ? ev.target.closest('.chip') : null;
+    if (el && el.dataset.id) { const id = el.dataset.id; closeSheet(); askWrite({ replace: id, free }); }
+  });
+}
+
 async function askNight() {
   if (busy) return;
   hideCoach();
-  if (g.day === 5 && !wroteToday) return toast('今晚上级检查：你必须再写一条规矩。');
+  if (g.day === 5 && !wroteToday) {
+    if (g.rules.length >= E.PARAMS.rulesMax) return askInspectionRewrite();
+    return toast('今晚上级检查：你必须再写一条规矩。');
+  }
   const holes = E.enumerateHoles(g);
   const sheet = openSheet(
     '<h3>今 夜 他 会 试 哪 条 路</h3>' +

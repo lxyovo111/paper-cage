@@ -1,0 +1,16 @@
+import { connect } from './browser.mjs';
+import { sleep } from './cdp.mjs';
+const b=await connect(); const ev=b.ev;
+const click=(sel)=>ev(`(()=>{const el=document.querySelector(${JSON.stringify(sel)}); if(!el) return false; el.dispatchEvent(new MouseEvent('click',{bubbles:true})); return true;})()`);
+await b.goto('http://127.0.0.1:7861/dist/index.html?seed=8&llm=0&speed=0.05&intro=0',1600);
+await click('.slot[data-slot="0"]'); await sleep(200);
+await ev('(()=>{const t=document.querySelector("#rtxt"); t.value="医务室的窗，任何时候都不许碰。"; t.dispatchEvent(new Event("input",{bubbles:true}));})()');
+await click('[data-k="compile"]'); await sleep(250); await click('[data-k="ok"]'); await sleep(400);
+console.log('wrote=', await ev('JSON.stringify({rules:window.__game.g.rules.length,ap:window.__game.g.ap})'));
+await ev('window.__game.g.day=4; window.__game.askNight()'); await sleep(300);
+console.log('day4=', await ev('JSON.stringify({title:(document.querySelector(".sheet h3")||{}).textContent,preds:document.querySelectorAll(".sheet .chip[data-k=pred]").length})'));
+await click('[data-k="skip"]'); await sleep(4500);
+console.log('afterNight=', await ev('JSON.stringify({day:window.__game.g.day,nights:window.__game.g.nights.length,toast:(document.querySelector("#toast")||{}).textContent})'));
+await ev('window.__game.askNight()'); await sleep(300);
+console.log('day5=', await ev('JSON.stringify({title:(document.querySelector(".sheet h3")||{}).textContent,preds:document.querySelectorAll(".sheet .chip[data-k=pred]").length,toast:(document.querySelector("#toast")||{}).textContent})'));
+b.close();

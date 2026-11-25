@@ -21,6 +21,18 @@ for (let step = 0; step < 60; step++) {
   if (ph === 'settle') break;
   await sleep(250);
   if (await click('[data-k="sick"]')) { console.log('sick choice'); await sleep(400); continue; }
+  // 第 5 天六条已满：上级检查会开「改写一条」的清单，选第一条并换一句新话。
+  if (await p.ev('!!document.querySelector(".sheet .chip[data-k=pick-rule]")')) {
+    await click('.sheet .chip');
+    await sleep(200);
+    await p.ev('(()=>{const t=document.querySelector("#rtxt"); t.value="放风区的墙，任何时候都不许碰。"; t.dispatchEvent(new Event("input",{bubbles:true}));})()');
+    await click('[data-k="compile"]');
+    await sleep(400);
+    await click('[data-k="ok"]');
+    await sleep(350);
+    console.log('inspection rewrite');
+    continue;
+  }
   // 写规矩（每天最多 2 条，留 1 AP 给入夜/预判）
   const canWrite = await p.ev('!!document.querySelector("[data-act=write]")');
   const ap = await p.ev('window.__game.g.ap');
