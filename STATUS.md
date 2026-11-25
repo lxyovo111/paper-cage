@@ -1,4 +1,4 @@
-# 《纸上牢笼》· 交付状态（2026-11-25 21:55）
+# 《纸上牢笼》· 交付状态（2026-11-25 22:05）
 
 ## 2026-11-25 第5天互锁修复（已上线并线上复测）
 
@@ -29,6 +29,7 @@
 - 上传 `index.html` 207,556 B / SHA256 `C4FC59FE71826D6A4765CD8F90206091033A18BB678D815B79F15BC44FF35864`，创空间文件列表显示 207.56KB；`tools/deploy925b.mjs` 重新部署，构建约 9 分钟。
 - `/play` 返回 200 / 184,731 字符，含 `askInspectionRewrite` 与「这条规矩不扣行动力」；线上 iframe 实测（`tools/live-inspection-zero2.mjs`，在 game iframe 内执行）：6 条 / day5 / AP0 → 上级检查 6 chip，提示「行动力已用完：这次改写不扣行动力。」→「改 写 第 ① 条」→「改 写 完 毕」free=true → 写下后 `{rules:6,id:"r1",ap:0}` → 再次入夜进入预判面板 9 chip。
 - 1 条 / day5 / AP0 路径用同一 dist 包在本地 `test-inspection-zero-new.mjs` 验证：提示必须写 → 点空槽 → 副标题「这条规矩不扣行动力」→ 写入后 `{rules:2,ap:0}` → 再次入夜进入预判。
+- **创作手记 438502 已补第 10 节**「11-25 更新：第 5 天的互锁（补充）」并发布：`PUT /api/v1/articles` 更新 `ContentDraft`（12050 → 13084 字符），再在 `/learn/editor/438502` 基础信息页点「发 布」→「知道了」；公开页大纲与正文均已出现第 10 节。`ContentMd` 仍是异步缓存（6451 字符、暂不含第 10 节），以公开页为准。
 - 线上地址：https://modelscope.cn/studios/lxyovo/six-rules ｜ https://lxyovo-six-rules.ms.show/play
 
 ## 2026-11-23 规则可核对性改版（已上线）
