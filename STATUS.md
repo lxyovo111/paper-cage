@@ -1,6 +1,6 @@
-# 《纸上牢笼》· 交付状态（2026-11-25 21:25）
+# 《纸上牢笼》· 交付状态（2026-11-25 21:55）
 
-## 2026-11-25 第5天互锁修复（本地已测，待上线）
+## 2026-11-25 第5天互锁修复（已上线并线上复测）
 
 起因：用户指出第5天「上级检查必须再写一条」与「最多六条」互锁，若前四天写满就会卡死。复盘后发现问题比预想更严重：
 
@@ -24,7 +24,12 @@
 - `node tools/dist-test.mjs`：完整一局 `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，`errors= none`。
 - `node tools/bundle.mjs` → `dist/index.html` 207,556 B。
 
-**部署状态：未上线。** 本机所有 Edge profile（`edge-cdp`、`edge-login`、`six-rules/edge-login`）与共享 DSH 浏览器都没有 ModelScope 登录态（`/api/v1/users/me` 返回 400；files 页没有「添加文件」）；`.ms-key` 只有读权限，git push 被远端拒绝 `token does not support repository operations`。因此线上仍是 2026-11-23 21:10 的版本。需要人类在共享浏览器登录 ModelScope（或提供有 repository 权限的 token）后才能上传并重新部署。
+**部署与线上复测（2026-11-25 21:51）：已上线。**
+- 用户在本机 Edge 默认 profile 手动登录 ModelScope；CDP 9232 可用（`tools/attach925.mjs` 支持 `CDP_PORT`）。
+- 上传 `index.html` 207,556 B / SHA256 `C4FC59FE71826D6A4765CD8F90206091033A18BB678D815B79F15BC44FF35864`，创空间文件列表显示 207.56KB；`tools/deploy925b.mjs` 重新部署，构建约 9 分钟。
+- `/play` 返回 200 / 184,731 字符，含 `askInspectionRewrite` 与「这条规矩不扣行动力」；线上 iframe 实测（`tools/live-inspection-zero2.mjs`，在 game iframe 内执行）：6 条 / day5 / AP0 → 上级检查 6 chip，提示「行动力已用完：这次改写不扣行动力。」→「改 写 第 ① 条」→「改 写 完 毕」free=true → 写下后 `{rules:6,id:"r1",ap:0}` → 再次入夜进入预判面板 9 chip。
+- 1 条 / day5 / AP0 路径用同一 dist 包在本地 `test-inspection-zero-new.mjs` 验证：提示必须写 → 点空槽 → 副标题「这条规矩不扣行动力」→ 写入后 `{rules:2,ap:0}` → 再次入夜进入预判。
+- 线上地址：https://modelscope.cn/studios/lxyovo/six-rules ｜ https://lxyovo-six-rules.ms.show/play
 
 ## 2026-11-23 规则可核对性改版（已上线）
 
@@ -50,7 +55,7 @@
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-23 21:10 重新部署成功：200 / 180,957 字符，含规则边界语义、确认卡、行动依据、地图联动、首回合引导、宽严代价、结局回顾；本机 dist/index.html 202,842 B 打包产物；部署路径见上节）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-25 21:51 重新部署成功：200 / 184,731 字符，含第5天上级检查改写、零行动力免单、按天重置 `wroteToday`；本机 dist/index.html 207,556 B 打包产物；线上 iframe 复测通过）
 - 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
