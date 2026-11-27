@@ -1,6 +1,6 @@
-# 《纸上牢笼》· 交付状态（2026-11-28 00:46）
+# 《纸上牢笼》· 交付状态（2026-11-28 01:05）
 
-## 2026-11-28 四个体验/工程漏洞修复（本地已测，待上线）
+## 2026-11-28 四个体验/工程漏洞修复（已上线并线上复测）
 
 起因：用户指出四处和界面/文案不一致的问题——① 手机竖屏/横屏的「定位」是死按钮；② 第 6 天「扣下他今天的行动」只清空物品，夜里照走；③ 第 4 天白天还带着第 3 夜的黑雨 0.70 执行率；④ 猜中预判实际有 4 点行动力，但界面只画 3 个点。
 
@@ -17,7 +17,15 @@
 - `node tools/test-p0-regressions.mjs` 13 条全过（`P0 PASS`）；`node tools/dist-test.mjs` 完整一局 `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，`errors= none`。
 - `node tools/bundle.mjs` → `dist/index.html` 211,949 B，SHA256 `F98CE03D55519C5ED65C5B5EF1E7B177112E5A121F12BF7675F06D0F8F6DB296`。
 
-**部署状态：未上线。** 可见 Edge（CDP 9232，默认 profile）当前没有 ModelScope 登录态：`localStorage` 无 `auth_token`，files 页没有「添加文件」。需要用户在该窗口登录后，执行 `Copy-Item dist\index.html .upload\index.html` → `$env:CDP_PORT="9232"; node tools/upload925.mjs "C:\Users\lcj\Desktop\tap\six-rules\.upload\index.html"` → `node tools/deploy925b.mjs`，再用 `tools/wait-deploy5.mjs` 等 `sickSkipNight` + 「他今天动不了」上线，然后线上复测。
+**部署与线上复测（2026-11-28 01:00）**：
+- 用户在 Edge 默认 profile 登录 ModelScope（CDP 9232）；上传 `index.html` 211,949 B / SHA256 `F98CE03D55519C5ED65C5B5EF1E7B177112E5A121F12BF7675F06D0F8F6DB296`（创空间提交 `0042fcbc`），`tools/deploy925b.mjs` 重新部署，00:55–01:00 构建约 5 分钟。
+- `/play` 返回 200 / 188,014 字符，含 `sickSkipNight` 与「他今天动不了」；`tools/wait-deploy5.mjs` 输出 `DEPLOYED_NEW`。
+- 线上 iframe 实测（`tools/live-four-fixes2.mjs`，`?llm=0&seed=8`）：
+  - `boot:{"game":true,"map":true,"old":false}`，地图外层已是 `#map-room`；
+  - 引擎：猜中预判 `{ap:4,apMax:4}`；第 3 夜后 `{day:4,blackout:false}`；第 6 天 ignore `{skipped:true,outcome:"idle",nights:1,trace:0,day:7}`；
+  - 界面：病假夜 `{phase:"day",day:7,skipped:true,text:true,sheet:false}`，没有预判面板，正文出现「他今天动不了」；猜中后 `{ap:4,apMax:4,viewApMax:4,dots:4}`，行动力圆点确实画 4 个。
+- 手机 390×844 与横屏 1100×540 的定位、4 个行动力点、病假夜文案由同一 `dist` 包的 `tools/test-four-fixes-ui.mjs` 本地覆盖（`FOUR FIXES UI PASS`）。
+- 线上地址：https://modelscope.cn/studios/lxyovo/six-rules ｜ https://lxyovo-six-rules.ms.show/play
 
 ## 2026-11-28 P0 规则解析三漏洞修复（已上线并线上复测）
 
