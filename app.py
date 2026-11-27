@@ -176,6 +176,7 @@ def _compile(payload):
 - 句子里出现「任何人 / 所有人 / 每个人 / 谁都不 / 无论谁」→ "any"
 - 否则 → "target"
 本局只有一名在押囚犯；狱警不是可被规矩约束的对象。
+本局没有同行机制；escort 只表示玩家提到了「同行」，不是可执行的例外。
 
 只输出 JSON，不要解释：
 {"lang":{"window":{"from":分钟,"to":分钟},"zones":"ALL"或["区域id"],"actions":["动作id"],"escort":true/false,"item":null,"boundary":"leave/enter/null","subject":"target/any"}}

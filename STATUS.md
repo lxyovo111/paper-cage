@@ -1,4 +1,30 @@
-# 《纸上牢笼》· 交付状态（2026-11-25 22:05）
+# 《纸上牢笼》· 交付状态（2026-11-28 00:35）
+
+## 2026-11-28 P0 规则解析三漏洞修复（已上线并线上复测）
+
+起因：用户指出三条会直接误导玩家的 P0——① 规则里只要出现「三」就可能被误绑到三号牢房；② 中文时间段只读第一个端点，第二个被忽略；③ 「两人同行」只写进判定条，引擎根本不执行。
+
+**改动**：
+- `game/engine.js:106`：ZONE_WORDS 的 cell3 匹配从 `/三号牢房|三号{0,0}/` 改为 `/自己的房间|他的房间|自己的牢房|他的牢房|牢房里|三号牢房|三号房|三号监室/`，删除会匹配任意「三」的 `三号{0,0}`。
+- `game/engine.js` `parseTime`：重写为收集阿拉伯/中文/「点」三类时间端点，按出现顺序取前两个；只对「凌晨/半夜」的中文数字端点做 12 小时制归零，不再误减 23 点。单端点仍默认 22:00 起、跨 7 小时。
+- `game/engine.js` `noteOf`：不再输出「需两人同行」，固定为「无例外」；`explainLang` 增加「本局只有一名在押囚犯，没有同行者；「两人同行」不作为例外」的明示；`ruleBlocks` 加注释说明 escort 不参与判定，未来若加押送/同行状态必须在这里真正执行。
+- `app.py:179`：LLM 提示词增加「本局没有同行机制；escort 只表示玩家提到了「同行」，不是可执行的例外」。
+- 新增 `tools/test-p0-regressions.mjs`。
+
+**本地验证**：
+- `node tools/test-p0-regressions.mjs`：13 条断言全过，输出 `P0 PASS`。覆盖三天/第三夜不绑 cell3、三号牢房仍绑、凌晨三点到五点=03:00–05:00、23点到1点=23:00–01:00、22点到5点、ASCII 23:00-01:00、凌晨十二点=00:00、23点到凌晨1点不被误减、三点半、escort 不再写「需两人同行」且有「没有同行者」警告、ruleBlocks 仍按普通禁止。
+- `node tools/test-rule-boundary.mjs`、`test-inspection.mjs`、`test-inspection-zero.mjs`、`test-inspection-zero-new.mjs` 全过；`node tools/dist-test.mjs` 完整一局 final `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，errors none。
+- `node tools/bundle.mjs` → `dist/index.html` 209,336 B，SHA256 `2F4577A17F4A47CC1D5AE26EEDCBA7C86C1BB7ADEBD87FA378482182ECEAEB52`。
+
+**部署与线上复测（2026-11-28 00:22 / 00:30）**：
+- 用默认 Edge profile + CDP 9232 登录态上传：`index.html` 209.34KB（创空间提交 `aa2602e9`）、`app.py` 19.03KB；两次「重新部署 → 确认部署」，第一次约 00:12–00:22、第二次约 00:24–00:30。
+- 最终 `/play` 200 / 186,009 字符；线上 iframe 实测（`tools/live-p0-iframe.mjs`，`?llm=0&seed=8`）：
+  - 「三天内不许离开房间。」→ `22:00–05:00 · 全区域 · 禁止离开 · 无例外`（不再绑三号牢房）；
+  - 「凌晨三点到五点不许离开。」→ `03:00–05:00 · 全区域 · 禁止离开 · 无例外`；
+  - 「两人同行才可以离开。」→ `22:00–05:00 · 全区域 · 禁止离开 · 无例外` + 「本局只有一名在押囚犯，没有同行者；「两人同行」不作为例外，这句话按普通禁止执行。」
+- 线上地址：https://modelscope.cn/studios/lxyovo/six-rules ｜ https://lxyovo-six-rules.ms.show/play
+
+
 
 ## 2026-11-25 第5天互锁修复（已上线并线上复测）
 
@@ -56,7 +82,7 @@
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-25 21:51 重新部署成功：200 / 184,731 字符，含第5天上级检查改写、零行动力免单、按天重置 `wroteToday`；本机 dist/index.html 207,556 B 打包产物；线上 iframe 复测通过）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-28 00:30 重新部署成功：200 / 186,009 字符，含 P0 三条规则解析修复；本机 dist/index.html 209,336 B / SHA256 `2F4577A1…EB52` 打包产物；线上 iframe 复测通过）
 - 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡

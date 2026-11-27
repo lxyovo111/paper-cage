@@ -103,7 +103,7 @@ export function inWindow(rule, t) {
 
 // ---------------- 自然语言 → 判定条 ----------------
 const ZONE_WORDS = [
-  [/自己的房间|他的房间|自己的牢房|他的牢房|牢房里|三号牢房|三号{0,0}/, 'cell3'], [/一号牢房/, 'cell1'], [/二号牢房/, 'cell2'],
+  [/自己的房间|他的房间|自己的牢房|他的牢房|牢房里|三号牢房|三号房|三号监室/, 'cell3'], [/一号牢房/, 'cell1'], [/二号牢房/, 'cell2'],
   [/走廊|过道/, 'corridor'], [/工具间/, 'workshop'], [/医务室/, 'medical'],
   [/食堂/, 'dining'], [/洗衣房/, 'laundry'], [/储藏室|仓库/, 'storage'], [/放风区|院子|操场/, 'yard'],
 ];
@@ -121,23 +121,52 @@ const OBJECT_WORDS = [[/窗/, 'window'], [/后门|食堂的门/, 'door'], [/围�
 
 function parseTime(text) {
   if (/全时段|任何时候|始终|全天|二十四小时|24小时/.test(text)) return { from: 0, to: 1439 };
-  let from = null, to = null;
-  const hm = [...text.matchAll(/(\d{1,2})[:：](\d{2})/g)];
-  if (hm.length >= 2) { from = +hm[0][1] * 60 + +hm[0][2]; to = +hm[1][1] * 60 + +hm[1][2]; }
-  else if (hm.length === 1) from = +hm[0][1] * 60 + +hm[0][2];
-  if (from === null) {
-    const ar = [...text.matchAll(/(\d{1,2})\s*[点时](半)?/g)];
-    if (ar.length) from = (+ar[0][1]) * 60 + (ar[0][2] ? 30 : 0);
-  }
-  if (from === null) {
-    const cn = [...text.matchAll(/([一二三四五六七八九十两]{1,3})点(半)?/g)];
-    if (cn.length) {
-      const map = { 一:1,二:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9,十:10,十一:11,十二:12,两:2 };
-      from = (map[cn[0][1]] ?? 0) * 60 + (cn[0][2] ? 30 : 0);
-      if (/凌晨|半夜/.test(text) && from >= 12 * 60) from -= 12 * 60;
+  const CN_DIGIT = { 零:0, 〇:0, 一:1, 二:2, 两:2, 三:3, 四:4, 五:5, 六:6, 七:7, 八:8, 九:9 };
+  function cnHour(s) {
+    if (!s) return null;
+    if (s.length === 1) return CN_DIGIT[s] ?? null;
+    if (s === '十') return 10;
+    if (s[0] === '十') { const u = CN_DIGIT[s[1]]; return u == null ? null : 10 + u; }
+    if (s[1] === '十') {
+      const t = CN_DIGIT[s[0]];
+      const u = s[2] ? CN_DIGIT[s[2]] : 0;
+      return t == null || u == null ? null : t * 10 + u;
     }
+    return null;
   }
-  if (from === null) from = /入夜|夜里|晚上|天黑|夜间/.test(text) ? 22 * 60 : 22 * 60;
+  // 收全部时间端点，再按出现顺序取前两个。旧实现各自只取数组第一个，
+  // 于是「凌晨三点到五点」「23点到1点」都会丢掉第二个端点，to 只能猜成 from+7h。
+  const hits = [];
+  const addHit = (index, kind, minutes) => {
+    if (Number.isFinite(minutes) && minutes >= 0 && minutes < 1440) hits.push({ index, kind, minutes });
+  };
+  for (const m of text.matchAll(/(\d{1,2})[:：](\d{2})/g)) {
+    const h = +m[1], min = +m[2];
+    if (h <= 23 && min <= 59) addHit(m.index, 'hm', h * 60 + min);
+  }
+  for (const m of text.matchAll(/(\d{1,2})\s*[点时](半)?/g)) {
+    const h = +m[1];
+    if (h <= 23) addHit(m.index, 'ar', h * 60 + (m[2] ? 30 : 0));
+  }
+  for (const m of text.matchAll(/([零〇一二三四五六七八九十两]{1,3})点(半)?/g)) {
+    const h = cnHour(m[1]);
+    if (h != null) addHit(m.index, 'cn', h * 60 + (m[2] ? 30 : 0));
+  }
+  hits.sort((a, b) => a.index - b.index);
+  const picks = [];
+  for (const h of hits) {
+    if (picks.length >= 2) break;
+    if (picks.length && picks[picks.length - 1].index === h.index) continue;
+    picks.push(h);
+  }
+  let from = picks[0] ? picks[0].minutes : null;
+  let to = picks[1] ? picks[1].minutes : null;
+  // 只对中文数字端点的「凌晨十二点/半夜十二点」做 24→0 换算；
+  // 不能因为句子里出现「凌晨」就把阿拉伯数字 23 点也减 12。
+  const early = /凌晨|半夜/.test(text);
+  if (early && picks[0] && picks[0].kind === 'cn' && from >= 12 * 60) from -= 12 * 60;
+  if (early && picks[1] && picks[1].kind === 'cn' && to >= 12 * 60) to -= 12 * 60;
+  if (from === null) from = 22 * 60;
   if (to === null) to = (from + 7 * 60) % 1440;
   return { from, to };
 }
@@ -150,7 +179,9 @@ export function noteOf(lang) {
     (lang.window.from === 0 && lang.window.to === 1439) ? '全时段' : fmt(lang.window.from) + '–' + fmt(lang.window.to),
     lang.zones === 'ALL' ? '全区域' : lang.zones.map(z => ROOMS[z].name).join('、'),
     limit,
-    lang.escort ? '需两人同行' : '无例外',
+    // 本局只有一名在押囚犯，没有同行者。escort 不是可执行条件，
+    // 不能写「需两人同行」制造一个实际不存在的例外。
+    '无例外',
   ].join(' · ');
 }
 
@@ -177,6 +208,7 @@ export function explainLang(lang) {
     notes.push('「自己的房间」只指他本人的三号牢房，不是所有牢房。');
   }
   if (L.boundary) notes.push('这是边界判定：只有跨过门槛时才算，待在房间里不会触发。');
+  if (L.escort) notes.push('本局只有一名在押囚犯，没有同行者；「两人同行」不作为例外，这句话按普通禁止执行。');
   if (L.zones === 'ALL') notes.push('全区域规矩执行率较低，写宽了狱警不会认真照办。');
   return { subject, time, place, limit, notes };
 }
@@ -227,6 +259,8 @@ export function compileRule(text) {
 export function ruleBlocks(rule, step, t, prevRoom) {
   if (!inWindow(rule, t)) return false;
   const { zones, actions, item, boundary } = rule.lang;
+  // escort 不参与判定：本局只有一名在押囚犯，没有同行者。
+  // 如果未来真的加「押送/同行」状态，必须在这里读 rule.lang.escort 并执行，而不是只写判定条。
   // 边界规矩：判的是「跨过门槛」这一步，而不是「在房间里做了什么」。
   // 例：「不得离开自己的房间」= 上一个房间在区域内、这一步要出去。
   // 这一步即使动作是取物/破坏，也算跨门；所以 boundary 不走 actions 过滤。
