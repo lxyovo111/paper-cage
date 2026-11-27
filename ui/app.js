@@ -630,7 +630,7 @@ async function runNight() {
   // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。
   const rk = await Promise.race([remarkP, wait(7500).then(() => null)]);
   const noteEl = y <= maxY + 6 ? appendLine(live, { t: '', text: (rk && rk.line) || (res.skipped ? '他今天没有下床。' : localNightLine(res.outcome)), kind: 'note', id: 'remark-line' }, y, compact) : null;
-  aiStat.lines += 1;
+  if (!res.skipped) aiStat.lines += 1;
   if (rk && rk.line && rk.by === 'llm') aiStat.linesLLM += 1;
   if (noteEl && (!rk || rk.by !== 'llm')) {
     remarkP.then(function (late) {

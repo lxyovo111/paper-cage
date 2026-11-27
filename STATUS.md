@@ -15,7 +15,7 @@
 - 新增 `tools/test-four-fixes.mjs`：手机/横屏都有 `#map-room`、无旧 `#map`；手机 4 个 AP 点位置；猜中后 `ap=4/apMax=4` 且花掉第 4 点后 apMax 仍保留；黑雨第 4 天 `blackout=false`；病假夜 `skipped/outcome=idle/trace=0`、`progress` 与物品不变、不揭示路线；叫医生不跳过夜。输出 `FOUR FIXES PASS`。
 - 新增 `tools/test-four-fixes-ui.mjs`（CDP 9222 + 本地 7861）：390×844 手机视口，报告行点击后出现 `#room-spot` 与「在地图上标出…」；真实猜中预判后 `view.apMax=4` 且手机画 4 个点；第 6 天 ignore 后 `askNight` 不给预判面板，夜报 `{"skipped":true,"outcome":"idle","trace":0}`，次日报告与「行动依据」显示「他病了」；1100×540 横屏同样定位成功。输出 `FOUR FIXES UI PASS`。
 - `node tools/test-p0-regressions.mjs` 13 条全过（`P0 PASS`）；`node tools/dist-test.mjs` 完整一局 `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，`errors= none`。
-- `node tools/bundle.mjs` → `dist/index.html` 211,931 B，SHA256 `403D1F066A8117B585E754DC1BD6A2EF8541E5487272106B4812BF56E373C2A7`。
+- `node tools/bundle.mjs` → `dist/index.html` 211,949 B，SHA256 `F98CE03D55519C5ED65C5B5EF1E7B177112E5A121F12BF7675F06D0F8F6DB296`。
 
 **部署状态：未上线。** 可见 Edge（CDP 9232，默认 profile）当前没有 ModelScope 登录态：`localStorage` 无 `auth_token`，files 页没有「添加文件」。需要用户在该窗口登录后，执行 `Copy-Item dist\index.html .upload\index.html` → `$env:CDP_PORT="9232"; node tools/upload925.mjs "C:\Users\lcj\Desktop\tap\six-rules\.upload\index.html"` → `node tools/deploy925b.mjs`，再用 `tools/wait-deploy5.mjs` 等 `sickSkipNight` + 「他今天动不了」上线，然后线上复测。
 
