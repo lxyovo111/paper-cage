@@ -329,11 +329,11 @@ export function createGame(seed = 1) {
   const rng = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296);
   const habit = HABITS[Math.floor(rng() * HABITS.length)];
   return {
-    rng, day:1, maxDays:7, ap:PARAMS.apPerDay, progress:null,
+    rng, day:1, maxDays:7, ap:PARAMS.apPerDay, apMax:PARAMS.apPerDay, progress:null,
     rules: [], obedience:100, fatigue:0, trust:60, hostility:30, despair:20,
     prisoner:{ room:'cell3', items:[] },
     habit, intel:{ [habit.route]:true }, grudge:{},
-    prediction:null, warned:false, blackout:false, escaped:false, outcome:null,
+    prediction:null, warned:false, blackout:false, escaped:false, outcome:null, sickSkipNight:false,
     tutorialPending:true, notes:[], nights:[],
   };
 }
@@ -467,16 +467,35 @@ export function simulateNight(state, choice = {}) {
   const rng = state.rng;
   const events = [];
   const trace = [];
+  const skip = !!state.sickSkipNight;
+  state.sickSkipNight = false;
   const route = availableRoutes(state).find(r => r.id === choice.routeId) || ROUTES[1];
   const mood = moodOf(state);   // 入夜这一刻的心情；夜里涨的敌意留到下一夜
-  const wasKnown = !!(state.intel && state.intel[route.id]);
-  state.intel[route.id] = true;   // 他走过一次，这条路你就摸清了
+  const wasKnown = !skip && !!(state.intel && state.intel[route.id]);
+  if (!skip) state.intel[route.id] = true;   // 他走过一次，这条路你就摸清了
   const push = (t, kind, text, extra = {}) => events.push({ t:fmt(t), kind, text, ...extra });
 
   state.blackout = state.day === 3;
   let t = PARAMS.nightStart;
   let outcome = 'idle';
   const carried = new Set(state.prisoner.items);
+
+  // 第 6 天「扣下他今天的行动」：这一夜他确实不出门。
+  // 不能只清空口袋——progress.done 会让他从原处接着走，清空物品几乎不构成损失。
+  if (skip) {
+    const night = state.day;
+    push(t, 'start', '熄灯。');
+    push(t, 'note', '他今天动不了。');
+    state.tutorialPending = false;
+    state.nights.push({ night, routeId:null, routeName:'', routeTotal:0,
+      outcome:'idle', events:events.slice(), trace:[], startRoom:state.prisoner.room, skipped:true });
+    state.ap = PARAMS.apPerDay; state.apMax = PARAMS.apPerDay;
+    state.warned = false;
+    state.prediction = null;
+    if (state.day < state.maxDays) state.day += 1;
+    state.blackout = state.day === 3;
+    return { route:null, outcome:'idle', events, predictedRight:false, skipped:true };
+  }
 
   push(t, 'start', '熄灯。');
   // 阈值行为要在报告里留证据：同一局、同一套规矩，状态不同，这一步的叙述就不同
@@ -606,11 +625,13 @@ export function simulateNight(state, choice = {}) {
   const right = state.prediction === route.id;
   const rec = state.nights[state.nights.length - 1];
   if (rec) rec.predictedRight = right;
-  if (right) state.ap = Math.min(PARAMS.apMax, PARAMS.apPerDay + 1);
-  else state.ap = PARAMS.apPerDay;
+  if (right) { state.ap = Math.min(PARAMS.apMax, PARAMS.apPerDay + 1); state.apMax = state.ap; }
+  else { state.ap = PARAMS.apPerDay; state.apMax = PARAMS.apPerDay; }
   state.warned = false;   // 夜巡用完即止
   state.prediction = null;
   if (state.day < state.maxDays) state.day += 1;
+  // 暴雨断电只属于第 3 夜；第 4 天白天不能还带着夜里的 0.70 执行率。
+  state.blackout = state.day === 3;
 
   return { route, outcome, events, predictedRight:right };
 }
@@ -642,11 +663,12 @@ export const META = { ROOMS, ROUTES, ACTIONS, DAY_EVENTS, PARAMS, HABITS, ITEM_N
 export function sickChoice(state, kind) {
   if (state.day !== 6) return { ok:false, error:'还没到那一天。' };
   if (kind === 'treat') {
+    state.sickSkipNight = false;
     state.trust = Math.min(100, state.trust + 12);
     state.obedience = Math.min(100, state.obedience + 6);
     note(state, '你叫了医生。他今天没力气恨你。', 'act');
   } else {
-    state.prisoner.items = [];
+    state.sickSkipNight = true;
     state.obedience = Math.max(PARAMS.obedienceFloor, state.obedience - 4);
     note(state, '你扣了他的行动。他记住了这一笔。', 'act');
   }

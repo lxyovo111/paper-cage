@@ -141,7 +141,9 @@ function mapContent(st) {
 
 function mapBlock(st) {
   const night = st.phase === 'night';
-  let g = '<g id="map" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
+  // app.js 的 locateRoom() 在 #map-room 里加临时高亮；手机版必须用同一个 id，
+  // 否则报告行/行动依据里的「在地图上标出」会静默失败。
+  let g = '<g id="map-room" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
   g += '<defs><filter id="map-card-shadow" x="-60%" y="-60%" width="220%" height="220%">' +
     '<feGaussianBlur stdDeviation="2.4"/></filter></defs>';
   g += mapContent(st);

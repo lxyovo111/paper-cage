@@ -54,7 +54,7 @@ ov.addEventListener('click', (ev) => {
 
 // ---------- 视图同步 ----------
 function syncView() {
-  view.day = g.day; view.ap = g.ap; view.apMax = E.PARAMS.apPerDay;
+  view.day = g.day; view.ap = g.ap; view.apMax = g.apMax || E.PARAMS.apPerDay;
   view.obedience = Math.round(g.obedience); view.hostility = Math.round(g.hostility);
   view.rules = g.rules.map((r) => ({ text: r.text, note: r.note }));
 }
@@ -202,7 +202,8 @@ function dayBriefing() {
       slip:'狱警看了他一眼，把光挪开了。', escape:'他出去了。', idle:'今夜什么也没发生。' }[last.outcome] || '';
     const mv = pick('move');
     const act = last.events.filter((e) => ['take','break','climb','steal','note'].indexOf(e.kind) >= 0)[0];
-    if (last.outcome === 'idle' && !mv) lines.push({ t:'昨夜', text: out });
+    if (last.skipped) lines.push({ t:'昨夜', text:'他今天动不了，没有出门。' });
+    else if (last.outcome === 'idle' && !mv) lines.push({ t:'昨夜', text: out });
     else if (mv) { lines.push({ t:'昨夜', text: mv.text }); if (act) lines.push({ t:'', text: act.text }); }
     else lines.push({ t:'昨夜', text: out });
     if (last.reason) lines.push({ t:'', text:'他挑这条路，因为：' + last.reason });
@@ -385,7 +386,7 @@ function showWhy() {
     caught:'狱警抓住了他。',
     slip:'狱警看见了他，把光挪开了。',
     escape:'他出去了。',
-    idle:'这一夜什么也没发生。',
+    idle: last.skipped ? '他今天动不了，没有出门。' : '这一夜什么也没发生。',
   }[last.outcome] || '这一夜结束了。';
   const ruleIds = [...new Set(trace.filter((t) => t.ruleId).map((t) => t.ruleId))];
   const ruleRows = ruleIds.map((id) => {
@@ -398,21 +399,23 @@ function showWhy() {
     .map((t) => roomName(t.room)).filter(Boolean))];
   const sheet = openSheet(
     '<h3>这 一 夜 的 行 动 依 据</h3>' +
-    '<p class="sub">第 ' + (last.night || 1) + ' 夜 · 「' + esc(last.routeName || last.routeId) + '」</p>' +
+    '<p class="sub">第 ' + (last.night || 1) + ' 夜 · ' + (last.skipped ? '他病了' : '「' + esc(last.routeName || last.routeId) + '」') + '</p>' +
     '<div class="verdict">' +
-      '<div class="q">他从「' + esc(roomName(last.startRoom)) + '」出发，走的是「' + esc(last.routeName || '') + '」。</div>' +
+      '<div class="q">' + (last.skipped ? '他今天动不了，没有出门。' : '他从「' + esc(roomName(last.startRoom)) + '」出发，走的是「' + esc(last.routeName || '') + '」。') + '</div>' +
       '<div class="n">引擎判定：' + esc(outcome) + '</div>' +
     '</div>' +
     '<div class="why">' +
       '<h4>他这一夜实际走过的每一步</h4>' +
-      (trace.length ? trace.map(whyStepHtml).join('') : '<div class="wrule">这一夜他没有走出第一步。</div>') +
+      (trace.length ? trace.map(whyStepHtml).join('') : '<div class="wrule">' + (last.skipped ? '他今天没有行动，所以没有留下脚步。' : '这一夜他没有走出第一步。') + '</div>') +
       (trace.length < total ? '<div class="wrule">这条路线还有 ' + (total - trace.length) + ' 步，他这一夜没走到。</div>' : '') +
       '<h4>参与判定的规矩</h4>' +
       (ruleRows || '<div class="wrule">这一夜没有任何一条规矩碰到他的路线。</div>') +
       '<h4>引擎结论</h4>' +
-      '<div class="wrule">' + esc(last.outcome === 'escape'
-        ? '没有任何一条规矩真正拦住他。'
-        : (ruleRows ? '规矩参与了判定，结果以上面每一步的引擎判定为准。' : '他走的这条路上没有你的规矩；这是路线选择，不是判定失败。')) + '</div>' +
+      '<div class="wrule">' + esc(last.skipped
+        ? '他今天的行动被扣下了；这一夜没有发生路线判定。'
+        : (last.outcome === 'escape'
+          ? '没有任何一条规矩真正拦住他。'
+          : (ruleRows ? '规矩参与了判定，结果以上面每一步的引擎判定为准。' : '他走的这条路上没有你的规矩；这是路线选择，不是判定失败。'))) + '</div>' +
       (openRooms.length ? '<div class="wnote">这些落脚点没有被规矩拦到：' + esc(openRooms.join('、')) +
         '。下一次可以把规矩写到具体房间，或者守住他跨出去的那道门。</div>' : '') +
       '<div class="wnote">本页只复述引擎实际记录过的判定，不展示模型的思考过程。</div>' +
@@ -500,6 +503,8 @@ async function askNight() {
     if (g.rules.length >= E.PARAMS.rulesMax) return askInspectionRewrite();
     return toast('今晚上级检查：你必须再写一条规矩。');
   }
+  // 第 6 天扣了他的行动：这一夜没有路线可猜，直接入夜。
+  if (g.sickSkipNight) return runNight();
   const holes = E.enumerateHoles(g);
   const sheet = openSheet(
     '<h3>今 夜 他 会 试 哪 条 路</h3>' +
@@ -539,29 +544,42 @@ async function askNight() {
 
 async function runNight() {
   busy = true;
-  const holes = E.enumerateHoles(g);
+  const sickSkip = !!g.sickSkipNight;
+  const holes = sickSkip ? [] : E.enumerateHoles(g);
   // AI 的「决定」：引擎先把所有真实漏洞算清，LLM 只能在这张清单里挑一条最像人的；
   // 挑完仍由引擎逐条校验、执行。关掉 AI（?llm=0）就退回「第一条最松的路」，这就是 ablation。
   // 与动画并行：让 AI 挑路线的时间藏在「熄灯 + 画夜路」的 3.5 秒里
-  const pickP = chooseHole(holes, g).catch(() => null);
-  const guess = holes[0].id;
-  const route0 = E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1];
+  const pickP = sickSkip ? Promise.resolve(null) : chooseHole(holes, g).catch(() => null);
+  const guess = sickSkip ? null : holes[0].id;
+  const route0 = sickSkip ? null : (E.availableRoutes(g).find((r) => r.id === guess) || E.ROUTES[1]);
   view.phase = 'night'; syncView();
   audio.setMode('night'); audio.sfx('lights');
-  setTimeout(function () { audio.sfx('steps'); }, 900 * SPEED);
-  view.path = await pathFor(route0);
-  view.report = [];
-  await paint();
-  await wait(3500);
-  const pick = await pickP;
-  aiStat.picks += 1;
-  if (pick && pick.by === 'llm') aiStat.picksLLM += 1;
-  const actual = (pick && pick.id) || guess;
-  const route = E.availableRoutes(g).find((r) => r.id === actual) || E.ROUTES[1];
-  if (actual !== guess && route !== route0) {
-    view.path = await pathFor(route);
+  if (sickSkip) {
+    // 他病着，今晚没有夜路可画。报告只写「熄灯」和「他今天动不了」。
+    view.path = null;
+    view.tokens = null;
+    view.report = [];
     await paint();
-    await wait(2200);
+    await wait(1200);
+  } else {
+    setTimeout(function () { audio.sfx('steps'); }, 900 * SPEED);
+    view.path = await pathFor(route0);
+    view.report = [];
+    await paint();
+    await wait(3500);
+  }
+  const pick = await pickP;
+  let actual = null;
+  if (!sickSkip) {
+    aiStat.picks += 1;
+    if (pick && pick.by === 'llm') aiStat.picksLLM += 1;
+    actual = (pick && pick.id) || guess;
+    const route = E.availableRoutes(g).find((r) => r.id === actual) || E.ROUTES[1];
+    if (actual !== guess && route !== route0) {
+      view.path = await pathFor(route);
+      await paint();
+      await wait(2200);
+    }
   }
 
   const res = E.simulateNight(g, { routeId: actual });
@@ -573,7 +591,7 @@ async function runNight() {
   // AI 只写「他今晚的样子」这一句。判定、路线、结局全在引擎里，AI 没有权限改任何数值。
   // 与逐条打印并行：打印完它刚好回来，不额外等；关掉 AI 或超时就用模板句。
   const blk = res.events.find((e) => e.kind === 'block');
-  const remarkP = remark(g, {
+  const remarkP = sickSkip ? Promise.resolve(null) : remark(g, {
     routeName: res.route.name, outcome: res.outcome, blocked: blk ? blk.text : '',
   }).catch(() => null);
   const live = stage.querySelector('#report-live');
@@ -611,7 +629,7 @@ async function runNight() {
   }
   // 这句话永远要有：AI 慢就先落一句模板，AI 回来后原地换掉 —— 玩家不需要等任何人。
   const rk = await Promise.race([remarkP, wait(7500).then(() => null)]);
-  const noteEl = y <= maxY + 6 ? appendLine(live, { t: '', text: (rk && rk.line) || localNightLine(res.outcome), kind: 'note', id: 'remark-line' }, y, compact) : null;
+  const noteEl = y <= maxY + 6 ? appendLine(live, { t: '', text: (rk && rk.line) || (res.skipped ? '他今天没有下床。' : localNightLine(res.outcome)), kind: 'note', id: 'remark-line' }, y, compact) : null;
   aiStat.lines += 1;
   if (rk && rk.line && rk.by === 'llm') aiStat.linesLLM += 1;
   if (noteEl && (!rk || rk.by !== 'llm')) {

@@ -1,4 +1,23 @@
-# 《纸上牢笼》· 交付状态（2026-11-28 00:35）
+# 《纸上牢笼》· 交付状态（2026-11-28 00:46）
+
+## 2026-11-28 四个体验/工程漏洞修复（本地已测，待上线）
+
+起因：用户指出四处和界面/文案不一致的问题——① 手机竖屏/横屏的「定位」是死按钮；② 第 6 天「扣下他今天的行动」只清空物品，夜里照走；③ 第 4 天白天还带着第 3 夜的黑雨 0.70 执行率；④ 猜中预判实际有 4 点行动力，但界面只画 3 个点。
+
+**改动**：
+- `ui/mobile.js:144`、`ui/landscape.js:143`：地图外层由 `<g id="map">` 改为 `<g id="map-room">`。`ui/app.js:428` 的 `locateRoom()` 只查 `#map-room`，桌面版 `ui/map.js:631` 本来就有；手机/横屏现在和桌面共用同一层高亮。
+- `game/engine.js` `sickChoice()`：`ignore` 不再只是 `prisoner.items=[]`，改为设置 `state.sickSkipNight=true`；`simulateNight()` 开头识别该标记，走「熄灯 / 他今天动不了」的 idle 夜，不走路、不判定、不揭示路线，仍推进天数与行动力，并记录 `nights[].skipped=true`。
+- `ui/app.js` `runNight()`：病假夜不挑路、不画夜路、不调用 LLM 旁白；`askNight()` 在 `sickSkipNight` 时直接入夜，不再显示预判面板；次日报告与「行动依据」弹层对 skipped 夜单独措辞。
+- `game/engine.js` `simulateNight()` 结束：`state.blackout = state.day === 3`。第 3 夜判定时仍为 true；夜 3 结束推进到第 4 天后立即变 false，不再污染第 4 天白天的 `ruleStrength`/`enumerateHoles`/写规则提示。第 3 天白天为 true 是刻意的：当晚就是黑雨夜。
+- `game/engine.js` `createGame()` 新增 `apMax:PARAMS.apPerDay`；猜中预判时 `ap=4` 且 `apMax=4`，猜错/无预判恢复 3；`ui/app.js` `syncView()` 改为 `view.apMax = g.apMax || E.PARAMS.apPerDay`，桌面/竖屏/横屏三个版式原本就按 `st.apMax` 画点。
+
+**本地验证**：
+- 新增 `tools/test-four-fixes.mjs`：手机/横屏都有 `#map-room`、无旧 `#map`；手机 4 个 AP 点位置；猜中后 `ap=4/apMax=4` 且花掉第 4 点后 apMax 仍保留；黑雨第 4 天 `blackout=false`；病假夜 `skipped/outcome=idle/trace=0`、`progress` 与物品不变、不揭示路线；叫医生不跳过夜。输出 `FOUR FIXES PASS`。
+- 新增 `tools/test-four-fixes-ui.mjs`（CDP 9222 + 本地 7861）：390×844 手机视口，报告行点击后出现 `#room-spot` 与「在地图上标出…」；真实猜中预判后 `view.apMax=4` 且手机画 4 个点；第 6 天 ignore 后 `askNight` 不给预判面板，夜报 `{"skipped":true,"outcome":"idle","trace":0}`，次日报告与「行动依据」显示「他病了」；1100×540 横屏同样定位成功。输出 `FOUR FIXES UI PASS`。
+- `node tools/test-p0-regressions.mjs` 13 条全过（`P0 PASS`）；`node tools/dist-test.mjs` 完整一局 `{"phase":"settle","day":7,"escaped":true,"rules":6,"nights":6}`，`errors= none`。
+- `node tools/bundle.mjs` → `dist/index.html` 211,931 B，SHA256 `403D1F066A8117B585E754DC1BD6A2EF8541E5487272106B4812BF56E373C2A7`。
+
+**部署状态：未上线。** 可见 Edge（CDP 9232，默认 profile）当前没有 ModelScope 登录态：`localStorage` 无 `auth_token`，files 页没有「添加文件」。需要用户在该窗口登录后，执行 `Copy-Item dist\index.html .upload\index.html` → `$env:CDP_PORT="9232"; node tools/upload925.mjs "C:\Users\lcj\Desktop\tap\six-rules\.upload\index.html"` → `node tools/deploy925b.mjs`，再用 `tools/wait-deploy5.mjs` 等 `sickSkipNight` + 「他今天动不了」上线，然后线上复测。
 
 ## 2026-11-28 P0 规则解析三漏洞修复（已上线并线上复测）
 

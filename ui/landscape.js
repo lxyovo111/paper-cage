@@ -140,7 +140,8 @@ function mapContent(st) {
 
 function mapBlock(st) {
   const night = st.phase === 'night';
-  let g = '<g id="map" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
+  // 与桌面/竖屏共用 locateRoom() 的高亮层 id；改回 #map 会让「定位」变成死按钮。
+  let g = '<g id="map-room" transform="translate(' + MX + ' ' + MY + ') scale(' + MS.toFixed(5) + ')">';
   g += mapContent(st);
   if (night) {
     const p = st.path;
