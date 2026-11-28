@@ -1,4 +1,20 @@
-# 《纸上牢笼》· 交付状态（2026-11-28 01:05）
+# 《纸上牢笼》· 交付状态（2026-11-28 10:05）
+
+## 2026-11-28 演示视频清晰配音版 + 手记第 11 节（已上线）
+
+起因：用户提供 `C:/Users/lcj/Desktop/demo-90-清晰配音版.mp4`，要求替换演示视频链接，并把最近两轮修复补进创作手记，且不与已有第 8/9/10 节重复。
+
+**视频**：
+- 源文件 5,084,987 B / 1600×1000 / H.264 + AAC / 72.866667s；复制为项目根 `demo-90-voice.mp4` 后上传创空间（提交 `1b8316c9`），旧 `demo-90.mp4` 保留。
+- `README.md:17`、`docs/创作手记-模板版.md:8` 与手记正文顶部链接改为 `https://lxyovo-six-rules.ms.show/static/demo-90-voice.mp4`；README 上传创空间（提交 `c9056a66`）。
+- 重新部署：`tools/deploy925b.mjs` 点「重新部署 → 确认部署」成功；构建约 6 分钟（09:56–10:01）。`/static/demo-90-voice.mp4` 返回 206，`Content-Range: bytes 0-1/5084987`；完整下载 SHA256 `89EB9DFFCD04D0011789E7CD62AA7764AE89EAA0373F6456617EAA0115658B07`，与本地文件一致；`/play` 200 / 188,014 字符。
+- 线上地址：https://modelscope.cn/studios/lxyovo/six-rules ｜ https://lxyovo-six-rules.ms.show/play
+
+**手记**：
+- 438502 追加第 11 节「11. 11-28 更新：两轮修复，让判定条与界面说同一件事（补充）」，共 4 段：第一轮 P0（「三」误绑三号牢房 / 中文时间只读第一个端点 / 「两人同行」假例外 / 13 条回归）；第二轮四项（手机横屏定位 `#map-room` / 第 6 天病假夜真跳过 / 夜 3 黑雨不残留到第 4 天 / 猜中 +1 行动力的第 4 个点可见）；结尾「两轮都不改变判定与胜负，只把规则、界面、引擎三个版本对齐」。
+- `tools/update-article11.mjs` 追加 h2 + 4 p，并把正文内旧视频链接递归替换为新链接；`PUT /api/v1/articles` 返回 200，`ContentDraft` 13,084 → 14,104，`has10/has11=true`。
+- 发布：`/learn/edit/438502` → 下一步 → `/learn/editor/438502` → 发布 → 知道了 → `/posts/438502`；公开页大纲已列出第 11 节，正文顶部视频链接已是 `demo-90-voice.mp4`，更新时间 2026-11-28。没有重述第 8/9/10 节。
+- 注：发布后 API `ContentMd` 为 6,973 字符、tail 仍是第 10 节；公开页读取的是 `ContentDraft`，以公开页为准。
 
 ## 2026-11-28 四个体验/工程漏洞修复（已上线并线上复测）
 
@@ -109,8 +125,8 @@
 
 ## 公开链接
 - 试玩（创空间）：https://modelscope.cn/studios/lxyovo/six-rules
-- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-28 00:30 重新部署成功：200 / 186,009 字符，含 P0 三条规则解析修复；本机 dist/index.html 209,336 B / SHA256 `2F4577A1…EB52` 打包产物；线上 iframe 复测通过）
-- 演示视频（90 秒，含「同一局面，两种选择」对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90.mp4 （2026-11-21 10:04 更新：5,841,240 B / 72.87s / video/mp4，A/B 卡已重做为 AI 与兜底的选路对照）
+- 游戏直出页（创空间内 iframe）：https://lxyovo-six-rules.ms.show/play （2026-11-28 10:01 重新部署成功：200 / 188,014 字符，含四项体验修复；本机 dist/index.html 211,949 B / SHA256 `F98CE03D…F6DB296` 打包产物；线上 iframe 复测通过）
+- 演示视频（90 秒，清晰配音版，含「同一局面，两种选择」开 / 关 AI 对照卡）：https://lxyovo-six-rules.ms.show/static/demo-90-voice.mp4 （2026-11-28 10:01 更新：5,084,987 B / 72.87s / video/mp4；Range 206，Content-Range `bytes 0-1/5084987`；完整下载 SHA256 `89EB9DFF…5658B07`，与本地文件一致）
 - 创作手记（开发者实践）：https://modelscope.cn/posts/438502
   - 标题《纸上牢笼》创作手记 · 专题「AI+赛事」· 标签「基础模型LLM」· 封面为标题卡
 - 参赛报名：已审核通过（小红书方案 https://xhslink.cn/o/Afux7g4n5JK）

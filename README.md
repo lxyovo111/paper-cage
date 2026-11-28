@@ -14,7 +14,7 @@
 | 试玩（魔搭创空间） | https://modelscope.cn/studios/lxyovo/six-rules |
 | 开源仓库（Apache-2.0） | https://github.com/lxyovo111/paper-cage |
 | 游戏直出（无平台外壳） | https://lxyovo-six-rules.ms.show/play |
-| 90 秒演示视频 | https://lxyovo-six-rules.ms.show/static/demo-90.mp4 |
+| 90 秒演示视频（清晰配音版） | https://lxyovo-six-rules.ms.show/static/demo-90-voice.mp4 |
 | 创作手记 | https://modelscope.cn/posts/438502 |
 
 
